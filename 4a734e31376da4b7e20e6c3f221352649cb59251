@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "iDaHPBE",
+        "filename": "src/com/android/providers/telephony/MmsProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 1063
+      },
+      "writtenOn": "2013-06-14T12:13:48Z",
+      "side": 1,
+      "message": "Whitespace",
+      "revId": "4a734e31376da4b7e20e6c3f221352649cb59251",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "iFaCsAE",
+        "filename": "src/com/android/providers/telephony/MmsProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 1063
+      },
+      "writtenOn": "2013-06-14T12:13:48Z",
+      "side": 1,
+      "message": "As for contacts: I\u0027d check for incognito first instead of creating the cursor and throwing it away.",
+      "revId": "4a734e31376da4b7e20e6c3f221352649cb59251",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "iBZ9WBw",
+        "filename": "src/com/android/providers/telephony/MmsSmsProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 299,
+      "author": {
+        "id": 1063
+      },
+      "writtenOn": "2013-06-14T12:13:48Z",
+      "side": 1,
+      "message": "Same as in MmsProvider",
+      "revId": "4a734e31376da4b7e20e6c3f221352649cb59251",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "iPZ5xDA",
+        "filename": "src/com/android/providers/telephony/SmsProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 96,
+      "author": {
+        "id": 1063
+      },
+      "writtenOn": "2013-06-14T12:13:48Z",
+      "side": 1,
+      "message": "Same as in MmsProvider.",
+      "revId": "4a734e31376da4b7e20e6c3f221352649cb59251",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

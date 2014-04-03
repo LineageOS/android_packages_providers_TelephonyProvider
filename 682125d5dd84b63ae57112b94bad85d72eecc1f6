@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9aed3d3a_055a9683",
+        "filename": "src/com/android/providers/telephony/SmsProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 260,
+      "author": {
+        "id": 9432
+      },
+      "writtenOn": "2014-04-03T19:52:15Z",
+      "side": 1,
+      "message": "Switch statement should have a default case instead of initialize the variable \"type\" ?",
+      "revId": "682125d5dd84b63ae57112b94bad85d72eecc1f6",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

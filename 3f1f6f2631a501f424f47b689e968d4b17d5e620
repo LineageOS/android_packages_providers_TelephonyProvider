@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a1b2928_2e215bfc",
+        "filename": "src/com/android/providers/telephony/CdmaCallOptionProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2014-09-04T10:05:03Z",
+      "side": 1,
+      "message": "crappy indentation here too",
+      "revId": "3f1f6f2631a501f424f47b689e968d4b17d5e620",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

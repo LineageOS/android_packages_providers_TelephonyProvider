@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "faac7902_61c5605a",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 441,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2014-11-19T17:11:05Z",
+      "side": 1,
+      "message": "this is 100 chars?",
+      "revId": "d1075fd48f8213dea93cf534720a2d2dff937f79",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

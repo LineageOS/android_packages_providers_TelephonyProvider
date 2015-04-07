@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3ac371cc_ad174553",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 3
+      },
+      "lineNbr": 441,
+      "author": {
+        "id": 16
+      },
+      "writtenOn": "2015-04-07T23:35:36Z",
+      "side": 1,
+      "message": "Typo. Correction: \"Add if it\u0027s missing\"",
+      "revId": "aff1e61075ddb5cf06160109a86d8d7f00ce5036",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

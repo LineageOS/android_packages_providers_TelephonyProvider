@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a89bdaa_8806d61e",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 466,
+      "author": {
+        "id": 3671
+      },
+      "writtenOn": "2015-05-10T01:43:14Z",
+      "side": 1,
+      "message": "missing a closing bracket for the catch",
+      "revId": "82e746cd901973c930976fb2e7ccc1e249cee004",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

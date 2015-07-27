@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bf091321_5b883770",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 212,
+      "author": {
+        "id": 2195
+      },
+      "writtenOn": "2015-07-27T20:44:35Z",
+      "side": 1,
+      "message": "Had to use this rather than SubscriptionManager.DEFAULT_NW_MODE, as that\u0027s -1 and doesn\u0027t work well when we try to read a string as that (the MobileNetworkSettings summary handling), would get a:\n\nandroid.content.res.Resources$NotFoundException: String resource ID #0xffffffff\n\nbefore this.",
+      "range": {
+        "startLine": 212,
+        "startChar": 83,
+        "endLine": 212,
+        "endChar": 118
+      },
+      "revId": "e2b108c026d597e171b0122c03aad48e9946ecab",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

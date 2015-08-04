@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9f0e0f27_b74e48bf",
+        "filename": "src/com/android/providers/telephony/MmsSmsDatabaseHelper.java",
+        "patchSetId": 6
+      },
+      "lineNbr": 945,
+      "author": {
+        "id": 10631
+      },
+      "writtenOn": "2015-08-04T01:25:07Z",
+      "side": 1,
+      "message": "This will be bad",
+      "revId": "6a7b185c02ba4fd252d4f424db17fb4a8bcc112f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

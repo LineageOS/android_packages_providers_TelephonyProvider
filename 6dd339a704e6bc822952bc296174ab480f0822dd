@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5f4e5783_a8b7f33a",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 3
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 9813
+      },
+      "writtenOn": "2015-11-21T02:19:44Z",
+      "side": 1,
+      "message": "Any reason to jump to 21 and not something like 18? Or are you trying preserve the sequence from AOSP upgrades as a replay?",
+      "revId": "6dd339a704e6bc822952bc296174ab480f0822dd",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff82abbf_fcb0498e",
+        "filename": "src/com/android/providers/telephony/BlacklistProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 10631
+      },
+      "writtenOn": "2015-11-25T05:51:07Z",
+      "side": 1,
+      "message": "Need to turn this off in intellij.  Must qualify all imports. i.e. no *\u0027s ever.",
+      "revId": "e60a6c38c3f4cbcad5837e7a99fa620db1d60d32",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff82abbf_dca7854f",
+        "filename": "src/com/android/providers/telephony/BlacklistProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 154,
+      "author": {
+        "id": 10631
+      },
+      "writtenOn": "2015-11-25T05:51:07Z",
+      "side": 1,
+      "message": "Need to remove this or make it conditional on a debug flag",
+      "revId": "e60a6c38c3f4cbcad5837e7a99fa620db1d60d32",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff82abbf_7c62f918",
+        "filename": "src/com/android/providers/telephony/BlacklistProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 166,
+      "author": {
+        "id": 10631
+      },
+      "writtenOn": "2015-11-25T05:51:07Z",
+      "side": 1,
+      "message": "Same as above",
+      "revId": "e60a6c38c3f4cbcad5837e7a99fa620db1d60d32",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

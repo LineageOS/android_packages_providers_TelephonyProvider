@@ -34,6 +34,40 @@
       "revId": "1794cb5d2f08b090c373fa144cd85c5b3eb3fc8c",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff82abbf_6c71e4e0",
+        "filename": "src/com/android/providers/telephony/BlacklistProvider.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 149,
+      "author": {
+        "id": 10293
+      },
+      "writtenOn": "2015-11-26T07:41:08Z",
+      "side": 1,
+      "message": "If we are calling this variable mSharedPrefs I would suggest a more generic name for the file.\n\nOr keep the filename the same and call this mTimestampSharedPrefs",
+      "revId": "1794cb5d2f08b090c373fa144cd85c5b3eb3fc8c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff82abbf_2c73dce9",
+        "filename": "src/com/android/providers/telephony/BlacklistProvider.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 161,
+      "author": {
+        "id": 10293
+      },
+      "writtenOn": "2015-11-26T07:41:08Z",
+      "side": 1,
+      "message": "System.currentTimeMillis()?  not that it is a big deal",
+      "revId": "1794cb5d2f08b090c373fa144cd85c5b3eb3fc8c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }

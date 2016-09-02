@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1fa4df85_d85bc684",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 324,
+      "author": {
+        "id": 68
+      },
+      "writtenOn": "2016-09-02T16:07:06Z",
+      "side": 1,
+      "message": "Doesn\u0027t the schema need to be changed onUpgrade for the constraint to be enforced?",
+      "revId": "472eb96571b7034dc2dd4d6032871e44030746b1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

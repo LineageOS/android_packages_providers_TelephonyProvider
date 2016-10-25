@@ -2258,7 +2258,7 @@ public class TelephonyProvider extends ContentProvider
             where = where + "edited=" + USER_EDITED + ")";
         }
 
-        if (simCountWithSameNumeric == subInfoList.size() - 1) {
+        if (subInfoList != null && simCountWithSameNumeric == subInfoList.size() - 1) {
             //Reset where as all slots have same sims
             where = null;
         }

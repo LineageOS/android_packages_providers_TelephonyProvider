@@ -98,6 +98,7 @@ import android.util.Xml;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.IApnSourceService;
+import com.android.internal.telephony.RILConstants;
 import com.android.internal.util.XmlUtils;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -285,6 +286,8 @@ public class TelephonyProvider extends ContentProvider
                 + " INTEGER DEFAULT " + SubscriptionManager.SIM_PROVISIONED + ","
             + SubscriptionManager.IS_EMBEDDED + " INTEGER DEFAULT 0,"
             + SubscriptionManager.ACCESS_RULES + " BLOB,"
+            + SubscriptionManager.USER_NETWORK_MODE
+                + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ","
             + SubscriptionManager.IS_REMOVABLE + " INTEGER DEFAULT 0,"
             + SubscriptionManager.CB_EXTREME_THREAT_ALERT + " INTEGER DEFAULT 1,"
             + SubscriptionManager.CB_SEVERE_THREAT_ALERT + " INTEGER DEFAULT 1,"

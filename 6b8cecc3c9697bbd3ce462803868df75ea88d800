@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_4e1a2d7d",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 581,
+      "author": {
+        "id": 1063
+      },
+      "writtenOn": "2016-11-03T08:01:11Z",
+      "side": 1,
+      "message": "What\u0027s the point of this? I intentionally collapsed all checks into one, as the  \u0027\u003c (16 \u003c\u003c 16 | 6)\u0027 check covers all 3 of them.",
+      "revId": "6b8cecc3c9697bbd3ce462803868df75ea88d800",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

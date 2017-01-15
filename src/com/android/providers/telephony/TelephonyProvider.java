@@ -265,7 +265,7 @@ public class TelephonyProvider extends ContentProvider
                     + SubscriptionManager.DATA_ROAMING + " INTEGER DEFAULT " + SubscriptionManager.DATA_ROAMING_DEFAULT + ","
                     + SubscriptionManager.MCC + " INTEGER DEFAULT 0,"
                     + SubscriptionManager.MNC + " INTEGER DEFAULT 0,"
-                    + SubscriptionManager.USER_NETWORK_MODE + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ","
+                    + SubscriptionManager.USER_NETWORK_MODE + " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE + ","
                     + SubscriptionManager.CB_EXTREME_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_SEVERE_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_AMBER_ALERT + " INTEGER DEFAULT 1,"
@@ -682,7 +682,7 @@ public class TelephonyProvider extends ContentProvider
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE
                             + " ADD COLUMN " + SubscriptionManager.USER_NETWORK_MODE
-                            + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ";");
+                            + " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE + ";");
                 } catch (SQLiteException e) {
                     if (DBG) {
                         log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +

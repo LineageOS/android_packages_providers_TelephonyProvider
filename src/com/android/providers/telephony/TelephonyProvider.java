@@ -265,7 +265,6 @@ public class TelephonyProvider extends ContentProvider
                     + SubscriptionManager.DATA_ROAMING + " INTEGER DEFAULT " + SubscriptionManager.DATA_ROAMING_DEFAULT + ","
                     + SubscriptionManager.MCC + " INTEGER DEFAULT 0,"
                     + SubscriptionManager.MNC + " INTEGER DEFAULT 0,"
-                    + SubscriptionManager.USER_NETWORK_MODE + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ","
                     + SubscriptionManager.CB_EXTREME_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_SEVERE_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_AMBER_ALERT + " INTEGER DEFAULT 1,"
@@ -676,20 +675,6 @@ public class TelephonyProvider extends ContentProvider
                     }
                 }
                 oldVersion = 17 << 16 | 6;
-            }
-            if (oldVersion < (18 << 16 | 6)) {
-                try {
-                    // Try to update the siminfo table. It might not be there.
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE
-                            + " ADD COLUMN " + SubscriptionManager.USER_NETWORK_MODE
-                            + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ";");
-                } catch (SQLiteException e) {
-                    if (DBG) {
-                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
-                                " The table will get created in onOpen.");
-                    }
-                }
-                oldVersion = 18 << 16 | 6;
             }
             //CM Switched from Version13 to Version17/18, comments below reflect AOSP. In case
             //of CM we will be upgrading from version 18, but the logic applies.

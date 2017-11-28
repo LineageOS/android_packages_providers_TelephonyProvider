@@ -147,7 +147,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 42 << 16;
+    private static final int DATABASE_VERSION = 43 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -1071,7 +1071,8 @@ public class TelephonyProvider extends ContentProvider
                 }
                 oldVersion = 23 << 16 | 6;
             }
-            if (oldVersion < (24 << 16 | 6)) {
+            // In Lineage 14.1, we changed the version to 24 so the AOSP version 24 upgrade was skipped
+            if (oldVersion < (43 << 16 | 6)) {
                 Cursor c = null;
                 String[] proj = {"_id"};
                 recreateDB(db, proj, /* version */24);
@@ -1085,16 +1086,13 @@ public class TelephonyProvider extends ContentProvider
                             + NETWORK_TYPE_BITMASK + ": " + c.getCount());
                     c.close();
                 }
-                oldVersion = 24 << 16 | 6;
-            }
-            if (oldVersion < (25 << 16 | 6)) {
                 // Add a new column SubscriptionManager.CARD_ID into the database and set the value
                 // to be the same as the existing column SubscriptionManager.ICC_ID. In order to do
                 // this, we need to first make a copy of the existing SIMINFO_TABLE, set the value
                 // of the new column SubscriptionManager.CARD_ID, and replace the SIMINFO_TABLE with
                 // the new table.
-                Cursor c = null;
-                String[] proj = {SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID};
+                c = null;
+                proj = new String[] {SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID};
                 recreateSimInfoDB(c, db, proj);
                 if (VDBG) {
                     c = db.query(SIMINFO_TABLE, proj, null, null, null, null, null);
@@ -1107,9 +1105,6 @@ public class TelephonyProvider extends ContentProvider
                             + SubscriptionManager.CARD_ID + ": " + c.getCount());
                     c.close();
                 }
-                oldVersion = 25 << 16 | 6;
-            }
-            if (oldVersion < (26 << 16 | 6)) {
                 // Add a new column Carriers.APN_SET_ID into the database and set the value to
                 // Carriers.NO_SET_SET by default.
                 try {
@@ -1121,10 +1116,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 26 << 16 | 6;
-            }
 
-            if (oldVersion < (27 << 16 | 6)) {
                 // Add the new MCC_STRING and MNC_STRING columns into the subscription table,
                 // and attempt to populate them.
                 try {
@@ -1140,17 +1132,14 @@ public class TelephonyProvider extends ContentProvider
                     }
                 }
                 // Migrate the old integer values over to strings
-                String[] proj = {SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID,
+                proj = new String[] {SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID,
                         SubscriptionManager.MCC, SubscriptionManager.MNC};
-                try (Cursor c = db.query(SIMINFO_TABLE, proj, null, null, null, null, null)) {
-                    while (c.moveToNext()) {
-                        fillInMccMncStringAtCursor(mContext, db, c);
+                try (Cursor c2 = db.query(SIMINFO_TABLE, proj, null, null, null, null, null)) {
+                    while (c2.moveToNext()) {
+                        fillInMccMncStringAtCursor(mContext, db, c2);
                     }
                 }
-                oldVersion = 27 << 16 | 6;
-            }
 
-            if (oldVersion < (28 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1161,15 +1150,12 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 28 << 16 | 6;
-            }
 
-            if (oldVersion < (29 << 16 | 6)) {
                 try {
                     // Add a new column Telephony.CARRIER_ID into the database and add UNIQUE
                     // constraint into table. However, sqlite cannot add constraints to an existing
                     // table, so recreate the table.
-                    String[] proj = {"_id"};
+                    proj = new String[] {"_id"};
                     recreateDB(db, proj,  /* version */29);
                 } catch (SQLiteException e) {
                     if (DBG) {
@@ -1177,10 +1163,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 29 << 16 | 6;
-            }
 
-            if (oldVersion < (30 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1191,10 +1174,7 @@ public class TelephonyProvider extends ContentProvider
                             "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 30 << 16 | 6;
-            }
 
-            if (oldVersion < (31 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1205,10 +1185,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 31 << 16 | 6;
-            }
 
-            if (oldVersion < (32 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1219,10 +1196,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 32 << 16 | 6;
-            }
 
-            if (oldVersion < (33 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1233,10 +1207,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 33 << 16 | 6;
-            }
 
-            if (oldVersion < (34 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN " +
@@ -1248,10 +1219,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 34 << 16 | 6;
-            }
 
-            if (oldVersion < (35 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1263,10 +1231,7 @@ public class TelephonyProvider extends ContentProvider
                             "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 35 << 16 | 6;
-            }
 
-            if (oldVersion < (36 << 16 | 6)) {
                 // Add a new column Carriers.SKIP_464XLAT into the database and set the value to
                 // SKIP_464XLAT_DEFAULT.
                 try {
@@ -1278,10 +1243,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 36 << 16 | 6;
-            }
 
-            if (oldVersion < (37 << 16 | 6)) {
                 // Add new columns SubscriptionManager.EHPLMNS and SubscriptionManager.HPLMNS into
                 // the database.
                 try {
@@ -1295,10 +1257,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 37 << 16 | 6;
-            }
 
-            if (oldVersion < (38 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1309,10 +1268,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 38 << 16 | 6;
-            }
 
-            if (oldVersion < (39 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1323,10 +1279,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 39 << 16 | 6;
-            }
 
-            if (oldVersion < (40 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1337,10 +1290,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 40 << 16 | 6;
-            }
 
-            if (oldVersion < (41 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1351,10 +1301,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 41 << 16 | 6;
-            }
 
-            if (oldVersion < (42 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN " +
@@ -1365,6 +1312,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
+                oldVersion = 43 << 16 | 6;
             }
 
 

@@ -252,7 +252,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 67;
+    static final int DATABASE_VERSION = 68;
     private static final int IDLE_CONNECTION_TIMEOUT_MS = 30000;
 
     private final Context mContext;
@@ -1046,9 +1046,16 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     // email address if from an email gateway, otherwise same as address
     @VisibleForTesting
     void createSmsTables(SQLiteDatabase db) {
+        createSmsTables(db, false);
+    }
+
+    @VisibleForTesting
+    void createSmsTables(SQLiteDatabase db, boolean onlySMS) {
         // N.B.: Whenever the columns here are changed, the columns in
         // {@ref MmsSmsProvider} must be changed to match.
         db.execSQL(CREATE_SMS_TABLE_STRING);
+
+        if (onlySMS) return;
 
         db.execSQL(CREATE_RAW_TABLE_STRING);
 
@@ -1096,6 +1103,11 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
 
     @VisibleForTesting
     void createCommonTables(SQLiteDatabase db) {
+        createCommonTables(db, false);
+    }
+
+    @VisibleForTesting
+    void createCommonTables(SQLiteDatabase db, boolean threadsOnly) {
         // TODO Ensure that each entry is removed when the last use of
         // any address equivalent to its address is removed.
 
@@ -1108,9 +1120,10 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
          * will be used. The _id is created with AUTOINCREMENT so it
          * will never be reused again if a recipient is deleted.
          */
-        db.execSQL("CREATE TABLE canonical_addresses (" +
-                   "_id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                   "address TEXT);");
+        if (!threadsOnly)
+            db.execSQL("CREATE TABLE canonical_addresses (" +
+                       "_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                       "address TEXT);");
 
         /**
          * This table maps the subject and an ordered set of recipient
@@ -1133,6 +1146,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Threads.ERROR + " INTEGER DEFAULT 0," +
                    Threads.HAS_ATTACHMENT + " INTEGER DEFAULT 0);");
 
+        if (threadsOnly)
+            return;
         /**
          * This table stores the queue of messages to be sent/downloaded.
          */
@@ -1673,6 +1688,20 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             RcsProviderParticipantHelper.createParticipantTables(db);
             RcsProviderMessageHelper.createRcsMessageTables(db);
             RcsProviderEventHelper.createRcsEventTables(db);
+        case 68:
+            // upgrade from 14.1
+            if (currentVersion <= 68) {
+                return;
+            }
+            try {
+                upgradeDatabaseToVersion68(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -1975,6 +2004,39 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         } catch (SQLiteException e) {
             Log.e(TAG, "[upgradeDatabaseToVersion66] Exception adding column "
                     + "display_originating_addr; " + e);
+        }
+    }
+
+    private void upgradeDatabaseToVersion68(SQLiteDatabase db) {
+        try {
+            // back up and recreate sms table to drop priority column
+            db.execSQL("DROP TABLE IF EXISTS sms_tmp;");
+            db.execSQL("ALTER TABLE sms RENAME TO sms_tmp;");
+            createSmsTables(db, true);
+            final String columns = "_id, thread_id, address, person, date, date_sent, " +
+                    "protocol, read, status, type, reply_path_present, subject, body, service_center" +
+                    "locked, sub_id, error_code, creator, seen";
+            db.execSQL("INSERT INTO sms (" + columns + ") SELECT " + columns + " FROM sms_tmp");
+            db.execSQL("DROP TABLE sms_tmp;");
+        } catch (SQLiteException e) {
+            Log.e(TAG, "[upgradeDatabaseToVersion68] Exception removing column "
+                    + "priority; " + e);
+        }
+
+        // now do attachment_info and notification sections
+        try {
+            db.execSQL("DROP TABLE IF EXISTS threads_tmp;");
+            db.execSQL("ALTER TABLE threads RENAME TO threads_tmp;");
+            createCommonTables(db, true);
+            final String columns = Threads._ID + ", " + Threads.DATE + ", " + Threads.MESSAGE_COUNT +
+                ", " + Threads.RECIPIENT_IDS + ", " + Threads.SNIPPET + ", " + Threads.SNIPPET_CHARSET + ", " +
+                Threads.READ + ", " + Threads.ARCHIVED + ", " + Threads.TYPE + ", " + Threads.ERROR + ", " +
+                Threads.HAS_ATTACHMENT;
+            db.execSQL("INSERT INTO threads (" + columns + ") SELECT " + columns + " FROM threads_tmp");
+            db.execSQL("DROP TABLE threads_tmp");
+        } catch (SQLiteException e) {
+            Log.e(TAG, "[upgradeDatabaseToVersion68] Exception removing columns "
+                    + "from threads table; " + e);
         }
     }
 

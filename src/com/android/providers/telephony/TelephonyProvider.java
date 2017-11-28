@@ -133,7 +133,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 26 << 16;
+    private static final int DATABASE_VERSION = 27 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -981,7 +981,8 @@ public class TelephonyProvider extends ContentProvider
                 }
                 oldVersion = 23 << 16 | 6;
             }
-            if (oldVersion < (24 << 16 | 6)) {
+            // In Lineage 14.1, we changed the version to 24 so the AOSP version 24 upgrade was skipped
+            if (oldVersion < (27 << 16 | 6)) {
                 Cursor c = null;
                 String[] proj = {"_id"};
                 recreateDB(c, db, proj, /* version */24);
@@ -995,16 +996,13 @@ public class TelephonyProvider extends ContentProvider
                             + NETWORK_TYPE_BITMASK + ": " + c.getCount());
                     c.close();
                 }
-                oldVersion = 24 << 16 | 6;
-            }
-            if (oldVersion < (25 << 16 | 6)) {
                 // Add a new column SubscriptionManager.CARD_ID into the database and set the value
                 // to be the same as the existing column SubscriptionManager.ICC_ID. In order to do
                 // this, we need to first make a copy of the existing SIMINFO_TABLE, set the value
                 // of the new column SubscriptionManager.CARD_ID, and replace the SIMINFO_TABLE with
                 // the new table.
-                Cursor c = null;
-                String[] proj = {SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID};
+                c = null;
+                proj = new String[] {SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID};
                 recreateSimInfoDB(c, db, proj);
                 if (VDBG) {
                     c = db.query(SIMINFO_TABLE, proj, null, null, null, null, null);
@@ -1017,9 +1015,6 @@ public class TelephonyProvider extends ContentProvider
                             + SubscriptionManager.CARD_ID + ": " + c.getCount());
                     c.close();
                 }
-                oldVersion = 25 << 16 | 6;
-            }
-            if (oldVersion < (26 << 16 | 6)) {
                 // Add a new column Carriers.APN_SET_ID into the database and set the value to
                 // Carriers.NO_SET_SET by default.
                 try {
@@ -1031,7 +1026,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 26 << 16 | 6;
+                oldVersion = 27 << 16 | 6;
             }
             if (DBG) {
                 log("dbh.onUpgrade:- db=" + db + " oldV=" + oldVersion + " newV=" + newVersion);

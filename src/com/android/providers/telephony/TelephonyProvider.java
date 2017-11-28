@@ -119,7 +119,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 21 << 16;
+    private static final int DATABASE_VERSION = 24 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -816,8 +816,11 @@ public class TelephonyProvider extends ContentProvider
                 }
                 oldVersion = 18 << 16 | 6;
             }
-            if (oldVersion < (19 << 16 | 6)) {
-                // Upgrade steps from version 18 are:
+            // version 19 is latest AOSP version (i.e. Android 8.0).
+            // versions 20-23 are unused by AOSP.
+            // version 23 is latest cm-14.1 version
+            if (oldVersion < (24 << 16 | 6)) {
+                // Upgrade steps from Lineage 14.1 (version 23) are:
                 // 1. Create a temp table- done in createCarriersTable()
                 // 2. copy over APNs from old table to new table - done in copyDataToTmpTable()
                 // 3. Drop the existing table.
@@ -862,9 +865,7 @@ public class TelephonyProvider extends ContentProvider
                             ": " + c.getCount());
                     c.close();
                 }
-                oldVersion = 19 << 16 | 6;
-            }
-            if (oldVersion < (20 << 16 | 6)) {
+
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN " +
@@ -879,9 +880,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 20 << 16 | 6;
-            }
-            if (oldVersion < (21 << 16 | 6)) {
+
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + CARRIERS_TABLE + " ADD COLUMN " +
@@ -894,8 +893,9 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 21 << 16 | 6;
+                oldVersion = 24 << 16 | 6;
             }
+
             if (DBG) {
                 log("dbh.onUpgrade:- db=" + db + " oldV=" + oldVersion + " newV=" + newVersion);
             }

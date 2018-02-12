@@ -45,7 +45,7 @@
                  android:backupAgent="TelephonyBackupAgent"
                  android:restoreAnyVersion="true"
                  android:label="@string/app_label"
-                 android:icon="@mipmap/ic_launcher_phone"
+                 android:icon="@mipmap/ic_launcher"
                  android:usesCleartextTraffic="true"
                  android:forceQueryable="true"
                  android:defaultToDeviceProtectedStorage="true"

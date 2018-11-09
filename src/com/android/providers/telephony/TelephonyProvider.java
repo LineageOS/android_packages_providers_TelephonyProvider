@@ -117,7 +117,7 @@ public class TelephonyProvider extends ContentProvider
     private static final String DATABASE_NAME = "telephony.db";
     private static final int IDLE_CONNECTION_TIMEOUT_MS = 30000;
     private static final boolean DBG = true;
-    private static final boolean VDBG = false; // STOPSHIP if true
+    private static final boolean VDBG = true; // STOPSHIP if true
 
     private static final int DATABASE_VERSION = 24 << 16;
     private static final int URL_UNKNOWN = 0;

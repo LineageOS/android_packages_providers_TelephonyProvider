@@ -112,6 +112,10 @@ public class TelephonyProvider extends ContentProvider
 
     private static final String READ_ONLY = "read_only";
 
+    // Used to check if certain queries contain subqueries that may attempt to access sensitive
+    // fields in the carriers db.
+    private static final String SQL_SELECT_TOKEN = "select";
+
     private static final UriMatcher s_urlMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 
     private static final ContentValues s_currentNullMap;
@@ -1923,25 +1927,25 @@ public class TelephonyProvider extends ContentProvider
             }
         }
 
-        if (match != URL_SIMINFO) {
-            // Determine if we need to do a check for fields in the selection
-            boolean selectionOrSortContainsSensitiveFields;
+        // Determine if we need to do a check for fields in the selection
+        boolean selectionOrSortContainsSensitiveFields;
+        try {
+            selectionOrSortContainsSensitiveFields = containsSensitiveFields(selection);
+            selectionOrSortContainsSensitiveFields |= containsSensitiveFields(sort);
+        } catch (Exception e) {
+            // Malformed sql, check permission anyway.
+            selectionOrSortContainsSensitiveFields = true;
+        }
+        if (selectionOrSortContainsSensitiveFields) {
             try {
-                selectionOrSortContainsSensitiveFields = containsSensitiveFields(selection);
-                selectionOrSortContainsSensitiveFields |= containsSensitiveFields(sort);
-            } catch (Exception e) {
-                // Malformed sql, check permission anyway.
-                selectionOrSortContainsSensitiveFields = true;
+                checkPermission();
+            } catch (SecurityException e) {
+                EventLog.writeEvent(0x534e4554, "124107808", Binder.getCallingUid());
+                throw e;
             }
+        }
 
-            if (selectionOrSortContainsSensitiveFields) {
-                try {
-                    checkPermission();
-                } catch (SecurityException e) {
-                    EventLog.writeEvent(0x534e4554, "124107808", Binder.getCallingUid());
-                    throw e;
-                }
-            }
+        if (match != URL_SIMINFO) {
             if (projectionIn != null) {
                 for (String column : projectionIn) {
                     if (TYPE.equals(column) ||
@@ -1989,9 +1993,10 @@ public class TelephonyProvider extends ContentProvider
     private boolean containsSensitiveFields(String sqlStatement) {
         try {
             SqlTokenFinder.findTokens(sqlStatement, s -> {
-                switch (s) {
+                switch (s.toLowerCase()) {
                     case USER:
                     case PASSWORD:
+                    case SQL_SELECT_TOKEN:
                         throw new SecurityException();
                 }
             });

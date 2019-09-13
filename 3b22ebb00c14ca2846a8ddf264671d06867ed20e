@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "62ba6d17_3f921466",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 1133,
+      "author": {
+        "id": 15450
+      },
+      "writtenOn": "2019-09-13T07:54:00Z",
+      "side": 1,
+      "message": "This won\u0027t work. A try block with resources Statement only expects declarations.",
+      "revId": "3b22ebb00c14ca2846a8ddf264671d06867ed20e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}

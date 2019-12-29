@@ -147,7 +147,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 42 << 16;
+    private static final int DATABASE_VERSION = 43 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -1072,7 +1072,7 @@ public class TelephonyProvider extends ContentProvider
                 oldVersion = 23 << 16 | 6;
             }
             // In Lineage 14.1, we changed the version to 24 so the AOSP version 24 upgrade was skipped
-            if (oldVersion < (24 << 16 | 6)) {
+            if (oldVersion < (43 << 16 | 6)) {
                 Cursor c = null;
                 String[] proj = {"_id"};
                 recreateDB(db, proj, /* version */24);
@@ -1312,7 +1312,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 43 << 16 | 6;
+                oldVersion = 44 << 16 | 6;
             }
 
 

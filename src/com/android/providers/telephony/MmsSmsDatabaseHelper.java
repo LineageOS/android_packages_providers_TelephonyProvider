@@ -252,7 +252,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 67;
+    static final int DATABASE_VERSION = 68;
     private static final int IDLE_CONNECTION_TIMEOUT_MS = 30000;
 
     private final Context mContext;
@@ -1661,6 +1661,12 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 return;
             }
             // 67 was adding RcsProvider, but that was removed.
+            // fall through
+        case 68:
+            if (currentVersion <= 68) {
+                return;
+            }
+            // 68 was adding cm-14.1 migration, but that was removed.
             return;
         }
 

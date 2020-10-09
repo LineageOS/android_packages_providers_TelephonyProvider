@@ -1234,6 +1234,34 @@ public class TelephonyProvider extends ContentProvider
             }
 
             if (oldVersion < (28 << 16 | 6)) {
+                // In Lineage 16.0, we changed the version to 27
+                // so the AOSP version 27 upgrade would be skipped
+                // Add the new MCC_STRING and MNC_STRING columns into the subscription table,
+                // and attempt to populate them.
+                try {
+                    // Try to update the siminfo table. It might not be there.
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                            " ADD COLUMN " + Telephony.SimInfo.COLUMN_MCC_STRING + " TEXT;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                            " ADD COLUMN " + Telephony.SimInfo.COLUMN_MNC_STRING + " TEXT;");
+                } catch (SQLiteException e) {
+                    // For the case of not upgrading from 16.0,
+                    // the column already exists.
+                    // Ignore duplicate column exceptions
+                    if (!e.getMessage().contains("duplicate") && DBG) {
+                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
+                                " The table will get created in onOpen.");
+                    }
+                }
+                // Migrate the old integer values over to strings
+                String[] proj = {Telephony.SimInfo.COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID,
+                        Telephony.SimInfo.COLUMN_MCC, Telephony.SimInfo.COLUMN_MNC};
+                try (Cursor c = db.query(SIMINFO_TABLE, proj, null, null, null, null, null)) {
+                    while (c.moveToNext()) {
+                        fillInMccMncStringAtCursor(mContext, db, c);
+                    }
+                }
+
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1437,6 +1465,22 @@ public class TelephonyProvider extends ContentProvider
             }
 
             if (oldVersion < (43 << 16 | 6)) {
+                // In Lineage 17.1, we changed the version to 42
+                // so the AOSP version 42 upgrade would be skipped
+                try {
+                    // Try to update the siminfo table. It might not be there.
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN " +
+                            Telephony.SimInfo.COLUMN_ACCESS_RULES_FROM_CARRIER_CONFIGS + " BLOB;");
+                } catch (SQLiteException e) {
+                    // For the case of not upgrading from 17.1,
+                    // the column already exists.
+                    // Ignore duplicate column exceptions
+                    if (!e.getMessage().contains("duplicate") && DBG) {
+                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
+                                "The table will get created in onOpen.");
+                    }
+                }
+
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "

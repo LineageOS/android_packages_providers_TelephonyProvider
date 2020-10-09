@@ -1849,6 +1849,26 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         onCreate(db);
     }
 
+    @Override
+    public void onDowngrade(SQLiteDatabase db, int oldVersion, int currentVersion) {
+        Log.w(TAG, "Downgrading database from version " + oldVersion
+                + " to " + currentVersion + ".");
+
+        if (oldVersion == 68) {
+            // 68 was adding cm-14.1 migration, but that was removed.
+            db.beginTransaction();
+            try {
+                db.setVersion(currentVersion);
+                db.setTransactionSuccessful();
+            } finally {
+                db.endTransaction();
+            }
+            return;
+        }
+        throw new SQLiteException("Can't downgrade database from version " +
+                oldVersion + " to " + currentVersion);
+    }
+
     private void logException(
             Throwable ex, int oldVersion, int currentVersion, int upgradeVersion) {
         int exception = FAILURE_UNKNOWN;

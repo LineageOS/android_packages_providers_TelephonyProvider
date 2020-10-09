@@ -1207,7 +1207,9 @@ public class TelephonyProvider extends ContentProvider
                 oldVersion = 26 << 16 | 6;
             }
 
-            if (oldVersion < (27 << 16 | 6)) {
+            if (oldVersion < (28 << 16 | 6)) {
+                // In Lineage 16.0, we changed the version to 27
+                // so the AOSP version 27 upgrade would be skipped
                 // Add the new MCC_STRING and MNC_STRING columns into the subscription table,
                 // and attempt to populate them.
                 try {
@@ -1230,10 +1232,7 @@ public class TelephonyProvider extends ContentProvider
                         fillInMccMncStringAtCursor(mContext, db, c);
                     }
                 }
-                oldVersion = 27 << 16 | 6;
-            }
 
-            if (oldVersion < (28 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1423,7 +1422,9 @@ public class TelephonyProvider extends ContentProvider
                 oldVersion = 41 << 16 | 6;
             }
 
-            if (oldVersion < (42 << 16 | 6)) {
+            if (oldVersion < (44 << 16 | 6)) {
+                // In Lineage 17.1, we changed the version to 43
+                // so the AOSP version 42 and 43 upgrade would be skipped
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN " +
@@ -1434,9 +1435,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-            }
 
-            if (oldVersion < (43 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
@@ -1448,10 +1447,7 @@ public class TelephonyProvider extends ContentProvider
                                 "The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 43 << 16 | 6;
-            }
 
-            if (oldVersion < (44 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "

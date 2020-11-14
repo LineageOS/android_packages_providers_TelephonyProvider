@@ -2,6 +2,23 @@
   "comments": [
     {
       "key": {
+        "uuid": "9faf282d_bbfb98c6",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 1467,
+      "author": {
+        "id": 2681
+      },
+      "writtenOn": "2020-11-14T13:16:19Z",
+      "side": 1,
+      "message": "Another suggestion to fix 17.1 migration is to change the \u0027| 6\u0027 to \u0027| 9\u0027 to account for the higher old version",
+      "revId": "2b8eedf3a1a85650d98ce402f6f76bb83274bfa5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "8f1393c1_8eba7c65",
         "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
         "patchSetId": 2

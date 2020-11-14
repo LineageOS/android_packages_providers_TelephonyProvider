@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8f1393c1_8eba7c65",
+        "filename": "src/com/android/providers/telephony/TelephonyProvider.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 1468,
+      "author": {
+        "id": 2681
+      },
+      "writtenOn": "2020-11-14T13:14:49Z",
+      "side": 1,
+      "message": "17.1 actually went up to 43, so this upgrade path gets skipped during upgrade causing some problems",
+      "revId": "2b8eedf3a1a85650d98ce402f6f76bb83274bfa5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}

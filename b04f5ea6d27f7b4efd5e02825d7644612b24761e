@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c32e47ec_33cea534",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2022-08-29T17:14:03Z",
+      "side": 1,
+      "message": "Let\u0027s keep 17.1 support for another version just in case someone can upgrade, given that 20 is a relatively small upgrade.",
+      "revId": "b04f5ea6d27f7b4efd5e02825d7644612b24761e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}

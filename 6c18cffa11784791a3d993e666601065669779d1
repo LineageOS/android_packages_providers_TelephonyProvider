@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "dd8feb7c_4879162d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 25691
+      },
+      "writtenOn": "2023-08-14T07:48:33Z",
+      "side": 1,
+      "message": "Entire topic builds for and runs on Moto G5 Cedric. THANK YOU!",
+      "revId": "6c18cffa11784791a3d993e666601065669779d1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}

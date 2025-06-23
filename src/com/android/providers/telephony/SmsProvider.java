@@ -143,6 +143,13 @@ public class SmsProvider extends ContentProvider {
             }
         }
 
+        try {
+            SqlQueryChecker.checkSelection(selection);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Query rejected: " + e.getMessage());
+            return null;
+        }
+
         // Generate the body of the query.
         int match = sURLMatcher.match(url);
         SQLiteDatabase db = getReadableDatabase(match);

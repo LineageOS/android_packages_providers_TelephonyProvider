@@ -114,6 +114,14 @@ public class MmsProvider extends ContentProvider {
         // or received messages, without wap pushes.
         final boolean accessRestricted = ProviderUtil.isAccessRestricted(
                 getContext(), getCallingPackage(), Binder.getCallingUid());
+
+        try {
+            SqlQueryChecker.checkSelection(selection);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Query rejected: " + e.getMessage());
+            return null;
+        }
+
         final String pduTable = getPduTable(accessRestricted);
 
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();

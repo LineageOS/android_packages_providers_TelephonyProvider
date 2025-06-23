@@ -16,6 +16,8 @@
 
 package com.android.providers.telephony;
 
+import android.util.Log;
+
 public class SqlQueryChecker {
     private static final String SELECT_TOKEN = "select";
 
@@ -42,5 +44,16 @@ public class SqlQueryChecker {
                 SqlQueryChecker::checkToken);
         SQLiteTokenizer.tokenize(sortOrder, SQLiteTokenizer.OPTION_NONE,
                 SqlQueryChecker::checkToken);
+    }
+
+    /**
+     * Check the selection's bracketing, throwing an {@link IllegalArgumentException} if
+     * it is invalid. An invalid selection string could have unbalanced parentheses
+     * or attempt to break out of the intended boolean structure, potentially leading to
+     * SQL injection vulnerabilities.
+     */
+    static void checkSelection(String selection) {
+        Log.v("MmsProvider", "inside checkSelection checking sel: " + selection);
+        SQLiteTokenizer.tokenize(selection, SQLiteTokenizer.OPTION_CHECK_BRACKETS, null);
     }
 }

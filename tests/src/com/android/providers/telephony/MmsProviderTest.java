@@ -30,6 +30,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.content.res.Resources;
 import android.database.ContentObserver;
+import android.database.Cursor;
 import android.net.Uri;
 import android.provider.Telephony;
 import android.telephony.TelephonyManager;
@@ -196,5 +197,66 @@ public class MmsProviderTest extends TestCase {
         values.put(Telephony.Mms.TEXT_ONLY, 1);
         values.put(Telephony.Mms.THREAD_ID, 1);
         return values;
+    }
+
+    @Test
+    public void testQuery_withUnbalancedParentheses_throwsIllegalArgumentException() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String[] projection = new String[]{"_id"};
+        // Verify to check for unbalanced parentheses
+        String maliciousSelection = "1=1) OR (1=1";
+
+        Cursor cursor = mMmsProviderTestable.query(testUri, projection, maliciousSelection, null,
+                null);
+        assertNull("Cursor should be null due to caught exception for unbalanced parentheses",
+                cursor);
+    }
+
+    @Test
+    public void testQuery_withMaliciousClosingParenthesis_throwsIllegalArgumentException() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String[] projection = new String[]{"_id"};
+        // Verify to check for a closing parenthesis at the beginning
+        String maliciousSelection = ") OR (1=1";
+
+        Cursor cursor = mMmsProviderTestable.query(testUri, projection, maliciousSelection, null,
+                null);
+        assertNull("Cursor should be null due to caught exception for unbalanced parentheses",
+                cursor);
+    }
+
+    @Test
+    public void testQuery_withProperlyBalancedParentheses_doesNotReturnNull() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String[] projection = new String[]{"_id"};
+        String[] normalSelections = {
+                "(thread_id=1)", // Original test
+                "",              // New: Empty selection
+                "thread_id=1"    // New: Selection without parentheses
+        };
+
+        for (String selection : normalSelections) {
+            Cursor cursor = null;
+            try {
+                cursor = mMmsProviderTestable.query(testUri, projection, selection, null, null);
+                assertNotNull("Cursor should not be null for selection: \"" + selection + "\"",
+                        cursor);
+                Log.i(TAG,
+                        "Query with selection: \"" + selection + "\" returned cursor: " + cursor);
+            } catch (IllegalArgumentException e) {
+                if (e.getMessage() != null && e.getMessage().contains("Unbalanced brackets")) {
+                    fail("Should not have thrown IllegalArgumentException for selection '"
+                            + selection + "': " + e.getMessage());
+                }
+                Log.e(TAG, "Unexpected IllegalArgumentException for selection '" + selection + "'",
+                        e);
+                fail("Unexpected IllegalArgumentException for selection '" + selection + "': "
+                        + e.getMessage());
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        }
     }
 }

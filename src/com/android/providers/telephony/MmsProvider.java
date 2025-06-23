@@ -140,6 +140,13 @@ public class MmsProvider extends ContentProvider {
             SqlQueryChecker.checkQueryParametersForSubqueries(projection, selection, sortOrder);
         }
 
+        try {
+            SqlQueryChecker.checkSelection(selection);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Query rejected: " + e.getMessage());
+            return null;
+        }
+
         final String pduTable = getPduTable(accessRestricted);
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
 

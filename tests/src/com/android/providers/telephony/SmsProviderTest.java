@@ -31,6 +31,7 @@ import android.content.pm.ProviderInfo;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.UserHandle;
 import android.provider.Telephony;
@@ -266,6 +267,85 @@ public class SmsProviderTest extends TestCase {
                 "raw", null, null, null, null, null, null);
         assertEquals(0, cursor.getCount());
         cursor.close();
+    }
+
+    @Test
+    @SmallTest
+    public void testQuery_withUnbalancedParentheses_returnsNull() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        String[] projection = new String[]{Telephony.Sms._ID};
+        // Verify to check for unbalanced parentheses
+        String maliciousSelection = "1=1) OR (1=1";
+
+        Cursor cursor = mSmsProviderTestable.query(testUri, projection, maliciousSelection, null,
+                null);
+        assertNull("Cursor should be null due to caught exception for unbalanced parentheses",
+                cursor);
+    }
+
+    @Test
+    @SmallTest
+    public void testQuery_withMaliciousClosingParenthesis_returnsNull() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        String[] projection = new String[]{Telephony.Sms._ID};
+        // Verify to check for a closing parenthesis at the beginning
+        String maliciousSelection = ") OR (1=1";
+
+        Cursor cursor = mSmsProviderTestable.query(testUri, projection, maliciousSelection, null,
+                null);
+        assertNull(
+                "Cursor should be null due to caught exception for malicious closing parenthesis",
+                cursor);
+    }
+
+    @Test
+    @SmallTest
+    public void testQuery_withProperlyBalancedParentheses_doesNotReturnNull() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        String[] projection = new String[]{Telephony.Sms._ID};
+        String[] normalSelections = {
+                "(" + Telephony.Sms.READ + "=1)",  // Original test
+                "",                                // New: Empty selection
+                Telephony.Sms.READ + "=1"          // New: Selection without parentheses
+        };
+
+        SQLiteDatabase db = mSmsProviderTestable.mCeOpenHelper.getWritableDatabase();
+        try {
+            db.execSQL(
+                    "CREATE VIEW IF NOT EXISTS sms_restricted AS SELECT _id, thread_id, address, "
+                            + "person, date, date_sent, protocol, read, status, type, "
+                            + "reply_path_present, subject, body, service_center, locked, sub_id,"
+                            + " error_code, creator, seen FROM sms WHERE (type=1 OR type=2)");
+
+            for (String selection : normalSelections) {
+                Cursor cursor = null;
+                try {
+                    cursor = mSmsProviderTestable.query(testUri, projection, selection, null, null);
+                    assertNotNull("Cursor should not be null for selection: \"" + selection + "\"",
+                            cursor);
+                } catch (IllegalArgumentException e) {
+                    if (e.getMessage() != null && e.getMessage().contains("Unbalanced brackets")) {
+                        fail("Should not have thrown IllegalArgumentException for selection '"
+                                + selection + "': " + e.getMessage());
+                    }
+                    Log.e(TAG,
+                            "Unexpected IllegalArgumentException for selection '" + selection + "'",
+                            e);
+                    fail("Unexpected IllegalArgumentException for selection '" + selection + "': "
+                            + e.getMessage());
+                } finally {
+                    if (cursor != null) {
+                        cursor.close();
+                    }
+                }
+            }
+        } finally {
+            try {
+                db.execSQL("DROP VIEW IF EXISTS sms_restricted");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to drop sms_restricted view after test.", e);
+            }
+        }
     }
 
     private ContentValues getFakeRawValue() {

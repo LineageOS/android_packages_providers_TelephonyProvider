@@ -154,6 +154,13 @@ public class SmsProvider extends ContentProvider {
             }
         }
 
+        try {
+            SqlQueryChecker.checkSelection(selection);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Query rejected: " + e.getMessage());
+            return null;
+        }
+
         Cursor emptyCursor = new MatrixCursor((projectionIn == null) ?
                 (new String[] {}) : projectionIn);
 

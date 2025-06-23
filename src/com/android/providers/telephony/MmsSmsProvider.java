@@ -360,6 +360,13 @@ public class MmsSmsProvider extends ContentProvider {
             }
         }
 
+        try {
+            SqlQueryChecker.checkSelection(selection);
+        } catch (IllegalArgumentException e) {
+            Log.w(LOG_TAG, "Query rejected: " + e.getMessage());
+            return null;
+        }
+
         String selectionBySubIds;
         final long token = Binder.clearCallingIdentity();
         try {

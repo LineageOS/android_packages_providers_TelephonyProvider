@@ -35,6 +35,11 @@ import android.provider.Telephony;
 import android.telephony.TelephonyManager;
 import android.test.mock.MockContentResolver;
 import android.util.Log;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import junit.framework.TestCase;
 
@@ -42,11 +47,16 @@ import org.junit.Test;
 
 public class MmsProviderTest extends TestCase {
     private static final String TAG = "MmsProviderTest";
+    private static final String PARTS_DIR_NAME = "parts";
+    private File testDir;
+    private File partsDir;
 
     private MockContentResolver mContentResolver;
     private MmsProviderTestable mMmsProviderTestable;
 
     private int notifyChangeCount;
+
+    private Context context;
 
     @Override
     protected void setUp() throws Exception {
@@ -55,7 +65,7 @@ public class MmsProviderTest extends TestCase {
         mMmsProviderTestable = new MmsProviderTestable();
 
         // setup mocks
-        Context context = mock(Context.class);
+        context = mock(Context.class);
         PackageManager packageManager = mock(PackageManager.class);
         Resources resources = mock(Resources.class);
         when(context.getSystemService(eq(Context.APP_OPS_SERVICE)))
@@ -98,12 +108,27 @@ public class MmsProviderTest extends TestCase {
         mContentResolver.addProvider("mms", mMmsProviderTestable);
         Log.d(TAG, "MockContextWithProvider: Add MmsProvider to mResolver");
         notifyChangeCount = 0;
+
+        //Setup test directory
+        testDir = Files.createTempDirectory("testDir").toFile();
+        partsDir = new File(testDir, PARTS_DIR_NAME);
+        partsDir.mkdirs(); // Create the parts directory
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
         mMmsProviderTestable.closeDatabase();
+
+        if (testDir != null && testDir.exists()) {
+            File[] files = testDir.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    file.delete();
+                }
+            }
+            testDir.delete();
+        }
     }
 
     @Test
@@ -115,6 +140,32 @@ public class MmsProviderTest extends TestCase {
 
         assertEquals(expected, actual);
         assertEquals(1, notifyChangeCount);
+    }
+
+    @Test
+    public void testDeleteDataRows_pathStartsWithPartsDirectory_canDeleteFile() throws Exception {
+        // Create a file in the parts directory.
+        when(context.getDir(eq(PARTS_DIR_NAME), anyInt())).thenReturn(partsDir);
+        File validFile = new File(partsDir, "mms_part.txt");
+        validFile.createNewFile();
+
+        boolean canDeleteFile = MmsProviderTestable.isFilePathCanonical(
+                context, validFile);
+
+        assertTrue(canDeleteFile);
+    }
+
+    @Test
+    public void testDeleteDataRows_invalidPath_cannotDeleteFile() throws Exception {
+        // Create a file in the test directory, which is not under the parts directory.
+        when(context.getDir(eq(PARTS_DIR_NAME), anyInt())).thenReturn(partsDir);
+        File invalidFile = new File(testDir, "not_mms.txt");
+        invalidFile.createNewFile();
+
+        boolean canDeleteFile = MmsProviderTestable.isFilePathCanonical(
+                context, invalidFile);
+
+        assertFalse(canDeleteFile);
     }
 
     @Test

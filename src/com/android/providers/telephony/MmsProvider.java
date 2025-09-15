@@ -717,13 +717,15 @@ public class MmsProvider extends ContentProvider {
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
         int deletedRows = 0;
 
+        Context context = getContext();
+
         if (TABLE_PDU.equals(table)) {
-            deletedRows = deleteMessages(getContext(), db, finalSelection,
+            deletedRows = deleteMessages(context, db, finalSelection,
                                          selectionArgs, uri);
         } else if (TABLE_PART.equals(table)) {
-            deletedRows = deleteParts(db, finalSelection, selectionArgs);
+            deletedRows = deleteParts(context, db, finalSelection, selectionArgs);
         } else if (TABLE_DRM.equals(table)) {
-            deletedRows = deleteTempDrmData(db, finalSelection, selectionArgs);
+            deletedRows = deleteTempDrmData(context, db, finalSelection, selectionArgs);
         } else {
             deletedRows = db.delete(table, finalSelection, selectionArgs);
         }
@@ -748,7 +750,7 @@ public class MmsProvider extends ContentProvider {
             }
 
             while (cursor.moveToNext()) {
-                deleteParts(db, Part.MSG_ID + " = ?",
+                deleteParts(context, db, Part.MSG_ID + " = ?",
                         new String[] { String.valueOf(cursor.getLong(0)) });
             }
         } finally {
@@ -767,17 +769,17 @@ public class MmsProvider extends ContentProvider {
         return count;
     }
 
-    private static int deleteParts(SQLiteDatabase db, String selection,
+    private static int deleteParts(Context context, SQLiteDatabase db, String selection,
             String[] selectionArgs) {
-        return deleteDataRows(db, TABLE_PART, selection, selectionArgs);
+        return deleteDataRows(context, db, TABLE_PART, selection, selectionArgs);
     }
 
-    private static int deleteTempDrmData(SQLiteDatabase db, String selection,
+    private static int deleteTempDrmData(Context context, SQLiteDatabase db, String selection,
             String[] selectionArgs) {
-        return deleteDataRows(db, TABLE_DRM, selection, selectionArgs);
+        return deleteDataRows(context, db, TABLE_DRM, selection, selectionArgs);
     }
 
-    private static int deleteDataRows(SQLiteDatabase db, String table,
+    private static int deleteDataRows(Context context, SQLiteDatabase db, String table,
             String selection, String[] selectionArgs) {
         Cursor cursor = db.query(table, new String[] { "_data" },
                 selection, selectionArgs, null, null, null);
@@ -796,9 +798,25 @@ public class MmsProvider extends ContentProvider {
                 try {
                     // Delete the associated files saved on file-system.
                     String path = cursor.getString(0);
-                    if (path != null) {
-                        new File(path).delete();
+                    if (path == null) {
+                      continue;
                     }
+                    // Check if the path is canonical and belongs to the parts directory.
+                    File file = new File(path);
+                    boolean isPathCanonical = isFilePathCanonical(context, file);
+                    if (!isPathCanonical) {
+                        Log.e(
+                                TAG,
+                                "deleteFile: path "
+                                        + file.getCanonicalPath()
+                                        + " does not start with "
+                                        + context
+                                                .getDir(PARTS_DIR_NAME, 0)
+                                                .getCanonicalPath());
+                        continue;
+                    }
+
+                    file.delete();
                 } catch (Throwable ex) {
                     Log.e(TAG, ex.getMessage(), ex);
                 }
@@ -808,6 +826,20 @@ public class MmsProvider extends ContentProvider {
         }
 
         return db.delete(table, selection, selectionArgs);
+    }
+
+    @VisibleForTesting
+    public static boolean isFilePathCanonical(Context context, File file) {
+        try {
+            return file.getCanonicalPath()
+                    .startsWith(
+                        context
+                            .getDir(PARTS_DIR_NAME, 0)
+                            .getCanonicalPath());
+        } catch (IOException e) {
+            Log.e(TAG, "Exception in context#getDir#getCanonicalPath: " + e);
+            return false;
+        }
     }
 
     @Override
@@ -972,14 +1004,13 @@ public class MmsProvider extends ContentProvider {
         }
 
         File filePath = new File(path);
-        try {
+       try {
             // The MmsProvider shouldn't open a file that isn't MMS data, so we verify that the
             // _data path actually points to MMS data. That safeguards ourselves from callers who
             // inserted or updated a URI (more specifically the _data column) with disallowed paths.
             // TODO(afurtado): provide a more robust mechanism to avoid disallowed _data paths to
             // be inserted/updated in the first place, including via SQL injection.
-            if (!filePath.getCanonicalPath()
-                    .startsWith(getContext().getDir(PARTS_DIR_NAME, 0).getCanonicalPath())) {
+            if (!isFilePathCanonical(getContext(), filePath)) {
                 Log.e(TAG, "openFile: path "
                         + filePath.getCanonicalPath()
                         + " does not start with "
@@ -991,6 +1022,7 @@ public class MmsProvider extends ContentProvider {
             Log.e(TAG, "openFile: create path failed " + e, e);
             return null;
         }
+
 
         int modeBits = ParcelFileDescriptor.parseMode(mode);
         return ParcelFileDescriptor.open(filePath, modeBits);

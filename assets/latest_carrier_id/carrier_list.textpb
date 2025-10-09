@@ -108,22 +108,37 @@ carrier_id {
   carrier_name: "T-Mobile"
   carrier_attribute {
     mccmnc_tuple: "26002"
-    gid1: "11"
-    gid1: "12"
-    gid1: "16"
-    gid1: "17"
-    gid1: "21"
-    gid1: "22"
+    spn: "heyah"
     gid1: "23"
-    gid1: "24"
-    gid1: "26"
+    gid1: "29"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "26002"
+    spn: "Red Bull MOBILE"
+    gid1: "13"
+    gid1: "14"
+    gid1: "27"
+    gid1: "28"
   }
   carrier_attribute {
     mccmnc_tuple: "26002"
     spn: "T-Mobile.pl"
-    spn: "T-Mobile.pl Q"
-    spn: "heyah"
+    gid1: "10"
+    gid1: "11"
+    gid1: "12"
+    gid1: "16"
+    gid1: "17"
+    gid1: "20"
+    gid1: "21"
+    gid1: "22"
+    gid1: "24"
+    gid1: "26"
+    gid1: "30"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "26002"
     spn: "tu biedronka"
+    gid1: "25"
   }
 }
 carrier_id {
@@ -7848,9 +7863,7 @@ carrier_id {
     gid1: "4153"
     gid1: "4154"
     gid1: "4155"
-    gid1: "554D"
     gid1: "6132"
-    gid1: "6303"
     gid1: "6903"
     gid1: "756D"
     gid1: "7601"
@@ -12531,6 +12544,39 @@ carrier_id {
   }
 }
 carrier_id {
+  canonical_id: 2685
+  carrier_name: "Norwegian Armed Forces"
+  carrier_attribute {
+    mccmnc_tuple: "24202"
+    gid1: "5DFFFFFFFFFFFFFF"
+  }
+}
+carrier_id {
+  canonical_id: 2686
+  carrier_name: "Digi BE"
+  carrier_attribute {
+    mccmnc_tuple: "20612"
+  }
+}
+carrier_id {
+  canonical_id: 2687
+  carrier_name: "Spectrum"
+  carrier_attribute {
+    mccmnc_tuple: "310240"
+    spn: "Spectrum"
+    gid1: "BA02"
+    gid2: "A700"
+  }
+}
+carrier_id {
+  canonical_id: 2688
+  carrier_name: "Perfectum"
+  carrier_attribute {
+    mccmnc_tuple: "43411"
+    spn: "Perfectum"
+  }
+}
+carrier_id {
   canonical_id: 10000
   carrier_name: "Tracfone-ATT"
   carrier_attribute {
@@ -12947,4 +12993,4 @@ carrier_id {
   }
   parent_canonical_id: 32
 }
-version: 134217774
+version: 134217775

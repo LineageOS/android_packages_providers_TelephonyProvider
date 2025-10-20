@@ -57,6 +57,7 @@ import android.view.textclassifier.TextClassifier;
 import android.view.textclassifier.TextLinks;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.telephony.PackageBasedTokenUtil;
 import com.android.internal.telephony.SmsApplication;
 import com.android.internal.telephony.TelephonyPermissions;
 import com.android.internal.telephony.flags.Flags;
@@ -446,7 +447,8 @@ public class SmsProvider extends ContentProvider {
 
         try {
             Trace.beginSection("SmsProvider_query_otpSection");
-            if (Flags.redactOtpSms() && qb.getTables().startsWith(smsTable)
+            if (Telephony.Sms.isOtpRedactionEnabled(getContext())
+                    && qb.getTables().startsWith(smsTable)
                     && !canReadOtpSms(callingUid, callingPackage)) {
                 // If this app can't read OTP messages, only return messages without OTPs, or
                 // messages more than the threshold old, or messages still pending classification,
@@ -454,10 +456,17 @@ public class SmsProvider extends ContentProvider {
                 long otpCutoff = System.currentTimeMillis() - OTP_HIDING_TIME_MS;
                 long pendingOtpCutoff = System.currentTimeMillis() - OTP_CLASSIFICATION_TIMEOUT_MS;
                 @SuppressLint("DefaultLocale")
-                String where = String.format("%s = %d OR %s < %d OR (%s = %d AND %s < %d)",
+                final StringBuilder where = new StringBuilder(String.format(
+                        "%s = %d OR %s < %d OR (%s = %d AND %s < %d)",
                         Sms.CONTAINS_OTP, Sms.OTP_TYPE_NONE, Sms.DATE, otpCutoff,
-                        Sms.CONTAINS_OTP, Sms.OTP_TYPE_PENDING, Sms.DATE, pendingOtpCutoff);
-                qb.appendWhereStandalone(where);
+                        Sms.CONTAINS_OTP, Sms.OTP_TYPE_PENDING, Sms.DATE, pendingOtpCutoff));
+                final String hash = PackageBasedTokenUtil.generatePackageBasedToken(
+                        getContext().getPackageManager(), callingPackage);
+                if (hash != null) {
+                    where.append(String.format(" OR (%s LIKE '%%%s%%')",
+                            Sms.BODY, hash));
+                }
+                qb.appendWhereStandalone(where.toString());
             }
 
             Cursor ret = qb.query(db, projectionIn, selection, selectionArgs,
@@ -891,7 +900,7 @@ public class SmsProvider extends ContentProvider {
                 // Determine if incoming messages contain an OTP code
                 String message = values.getAsString(Sms.BODY);
                 int otpType;
-                if (Telephony.Sms.shouldCheckForOtp(message)) {
+                if (Telephony.Sms.shouldCheckForOtp(getContext(), message)) {
                     otpType = Telephony.Sms.OTP_TYPE_PENDING;
                     possibleOtpMessage = message;
                 } else {

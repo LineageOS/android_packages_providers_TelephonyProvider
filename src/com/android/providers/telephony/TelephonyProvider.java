@@ -2160,26 +2160,47 @@ public class TelephonyProvider extends ContentProvider
 
             if (oldVersion < (72 << 16 | 6)) {
                 try {
-                    // Try to update the siminfo table with new columns.
+                    /*
+                     * Defensive check for database upgrade to version 72.
+                     *
+                     * Context:
+                     * A constant for a column was renamed from 'IS_NTN' to 'IS_ONLY_NTN'. This
+                     * change was incorrectly backported to the v64 upgrade logic.
+                     *
+                     * Problem:
+                     * For devices upgrading directly from a version prior to v64 to v72, the v64
+                     * logic first adds the 'is_only_ntn' column. The v72 logic then attempts to add
+                     * it again, causing a "duplicate column name" exception.
+                     *
+                     * Solution:
+                     * This block robustly handles all upgrade paths by using defensive checks for
+                     * known issues and a try-catch for any other unexpected SQLite exceptions.
+                     */
+
+                    // This column is new to v72 and has no upgrade conflicts. Add directly.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
                             + Telephony.SimInfo.COLUMN_SATELLITE_ESOS_SUPPORTED
                             + " INTEGER DEFAULT 0;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + Telephony.SimInfo.COLUMN_IS_ONLY_NTN + " INTEGER DEFAULT 0;");
 
-                    // Copy the value of the previous column (COLUMN_IS_NTN) to the new column
-                    // (COLUMN_IS_ONLY_NTN) for all rows in the sim_info table.
+                    // Defensively add 'is_only_ntn' only if it doesn't already exist.
+                    // This is the specific fix for the "prior to v64" to v72 upgrade path.
+                    if (!columnExists(db, SIMINFO_TABLE, Telephony.SimInfo.COLUMN_IS_ONLY_NTN)) {
+                        db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                                + Telephony.SimInfo.COLUMN_IS_ONLY_NTN + " INTEGER DEFAULT 0;");
+                    }
+
+                    // If the old 'is_ntn' column exists, migrate its data to the new column and
+                    // drop it.
                     final String columnIsNtn = "is_ntn";
-                    db.execSQL("UPDATE " + SIMINFO_TABLE + " SET "
-                            + Telephony.SimInfo.COLUMN_IS_ONLY_NTN + " = " + columnIsNtn + ";");
-
-                    // ALTER TABLE siminfo DROP is_ntn;
-                    db.execSQL(
-                            "ALTER TABLE " + SIMINFO_TABLE + " DROP COLUMN " + columnIsNtn + ";");
+                    if (columnExists(db, SIMINFO_TABLE, columnIsNtn)) {
+                        db.execSQL("UPDATE " + SIMINFO_TABLE + " SET "
+                                + Telephony.SimInfo.COLUMN_IS_ONLY_NTN + " = " + columnIsNtn + ";");
+                        db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " DROP COLUMN " + columnIsNtn
+                                + ";");
+                    }
                 } catch (SQLiteException e) {
                     if (DBG) {
-                        log("onUpgrade failed to update " + SIMINFO_TABLE
-                                + " to add is satellite esos supported");
+                        log("onUpgrade failed to update " + SIMINFO_TABLE + " to version 72: " + e);
                     }
                 }
                 oldVersion = 72 << 16 | 6;
@@ -6122,6 +6143,33 @@ public class TelephonyProvider extends ContentProvider
                     Telephony.SimInfo.COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID + "=?",
                     new String[]{subId});
         }
+    }
+
+    /**
+     * Checks if a column exists in the given table.
+     * @param db The database.
+     * @param tableName The name of the table.
+     * @param columnName The name of the column.
+     * @return {@code true} if the column exists, {@code false} otherwise.
+     */
+    private boolean columnExists(SQLiteDatabase db, String tableName, String columnName) {
+        Cursor cursor = null;
+        try {
+            // Query with a limit of 0 to avoid reading data; we only need the schema.
+            cursor = db.query(tableName, null, null, null, null, null, null, "0");
+            if (cursor != null) {
+                return cursor.getColumnIndex(columnName) != -1;
+            }
+        } catch (Exception e) {
+            log("Failed to check if column '" + columnName + "' exists in table '"
+                    + tableName + "': " + e);
+            return false;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return false;
     }
 
     /**

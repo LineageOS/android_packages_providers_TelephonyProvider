@@ -453,8 +453,10 @@ public class SmsProvider extends ContentProvider {
                 // If this app can't read OTP messages, only return messages without OTPs, or
                 // messages more than the threshold old, or messages still pending classification,
                 // past the classification cutoff time.
-                long otpCutoff = System.currentTimeMillis() - OTP_HIDING_TIME_MS;
-                long pendingOtpCutoff = System.currentTimeMillis() - OTP_CLASSIFICATION_TIMEOUT_MS;
+                long startOfCurrentMinuteInMs = (System.currentTimeMillis() / 60000) * 60000;
+                long otpCutoff = startOfCurrentMinuteInMs - OTP_HIDING_TIME_MS;
+                long startOfCurrentSecondInMs = (System.currentTimeMillis() / 1000) * 1000;
+                long pendingOtpCutoff = startOfCurrentSecondInMs - OTP_CLASSIFICATION_TIMEOUT_MS;
                 @SuppressLint("DefaultLocale")
                 final StringBuilder where = new StringBuilder(String.format(
                         "%s = %d OR %s < %d OR (%s = %d AND %s < %d)",

@@ -16,7 +16,9 @@
 
 package com.android.providers.telephony;
 
+import android.Manifest;
 import android.annotation.NonNull;
+import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.app.AppOpsManager;
 import android.content.BroadcastReceiver;
@@ -175,6 +177,7 @@ public class SmsProvider extends ContentProvider {
         return accessRestricted ? VIEW_SMS_RESTRICTED : TABLE_SMS;
     }
 
+    @RequiresPermission(Manifest.permission.INTERACT_ACROSS_USERS)
     @Override
     public Cursor query(Uri url, String[] projectionIn, String selection,
             String[] selectionArgs, String sort) {
@@ -463,7 +466,7 @@ public class SmsProvider extends ContentProvider {
                         Sms.CONTAINS_OTP, Sms.OTP_TYPE_NONE, Sms.DATE, otpCutoff,
                         Sms.CONTAINS_OTP, Sms.OTP_TYPE_PENDING, Sms.DATE, pendingOtpCutoff));
                 final String hash = PackageBasedTokenUtil.generatePackageBasedToken(
-                        getContext().getPackageManager(), callingPackage);
+                        getContext().getPackageManager(), callingPackage, callerUserHandle);
                 if (hash != null) {
                     where.append(String.format(" OR (%s LIKE '%%%s%%')",
                             Sms.BODY, hash));

@@ -253,9 +253,10 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 21
-  carrier_name: "Vodafone"
+  carrier_name: "One NZ"
   carrier_attribute {
     mccmnc_tuple: "53001"
+    spn: "One NZ"
     spn: "vodafone NZ"
   }
 }
@@ -701,7 +702,7 @@ carrier_id {
   canonical_id: 574
   carrier_name: "Ice Wireless"
   carrier_attribute {
-    mccmnc_tuple: "30262"
+    mccmnc_tuple: "302620"
   }
 }
 carrier_id {
@@ -5694,6 +5695,7 @@ carrier_id {
   carrier_name: "East Kentucky Network LLC dba Appalachian Wireless"
   carrier_attribute {
     mccmnc_tuple: "310750"
+    mccmnc_tuple: "312130"
   }
 }
 carrier_id {
@@ -8071,6 +8073,7 @@ carrier_id {
     mccmnc_tuple: "21403"
     mccmnc_tuple: "21408"
     spn: "EUSKALTEL"
+    spn: "Euskaltel"
   }
 }
 carrier_id {
@@ -8415,7 +8418,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 2143
-  carrier_name: "Truphone"
+  carrier_name: "1GLOBAL"
   carrier_attribute {
     mccmnc_tuple: "20404"
     mccmnc_tuple: "20408"
@@ -8423,11 +8426,11 @@ carrier_id {
     mccmnc_tuple: "20809"
     mccmnc_tuple: "20812"
     mccmnc_tuple: "21427"
+    mccmnc_tuple: "23410"
     mccmnc_tuple: "23425"
     mccmnc_tuple: "26033"
     mccmnc_tuple: "26242"
     mccmnc_tuple: "310300"
-    mccmnc_tuple: "310690"
     mccmnc_tuple: "45400"
     mccmnc_tuple: "45408"
     mccmnc_tuple: "50538"
@@ -11755,7 +11758,7 @@ carrier_id {
   }
   carrier_attribute {
     mccmnc_tuple: "24007"
-    gid1: "41"
+    gid1: "0041"
   }
 }
 carrier_id {
@@ -11790,7 +11793,7 @@ carrier_id {
   }
   carrier_attribute {
     mccmnc_tuple: "24007"
-    gid1: "40"
+    gid1: "0040"
   }
 }
 carrier_id {
@@ -11801,7 +11804,7 @@ carrier_id {
   }
   carrier_attribute {
     mccmnc_tuple: "24007"
-    gid1: "48"
+    gid1: "0048"
   }
 }
 carrier_id {
@@ -11812,7 +11815,7 @@ carrier_id {
   }
   carrier_attribute {
     mccmnc_tuple: "24007"
-    gid1: "52"
+    gid1: "0052"
   }
 }
 carrier_id {
@@ -12352,8 +12355,120 @@ carrier_id {
   carrier_name: "iWay"
   carrier_attribute {
     mccmnc_tuple: "22873"
-    spn: "ispmobile"
-    spn: "iWay"
+  }
+}
+carrier_id {
+  canonical_id: 2666
+  carrier_name: "Telecom26"
+  carrier_attribute {
+    mccmnc_tuple: "20404"
+    mccmnc_tuple: "22201"
+    mccmnc_tuple: "22862"
+    mccmnc_tuple: "23455"
+    mccmnc_tuple: "42402"
+    mccmnc_tuple: "51503"
+    mccmnc_tuple: "73001"
+    mccmnc_tuple: "90146"
+    gid1: "54656c65636f6d3236"
+  }
+}
+carrier_id {
+  canonical_id: 2667
+  carrier_name: "Gigs"
+  carrier_attribute {
+    mccmnc_tuple: "23415"
+    spn: "Gigs"
+    gid1: "22"
+  }
+}
+carrier_id {
+  canonical_id: 2668
+  carrier_name: "TELUS Cloud Core"
+  carrier_attribute {
+    mccmnc_tuple: "302220"
+    mccmnc_tuple: "302221"
+    gid1: "4C4F"
+  }
+}
+carrier_id {
+  canonical_id: 2669
+  carrier_name: "Execulink Telecom"
+  carrier_attribute {
+    mccmnc_tuple: "302340"
+  }
+}
+carrier_id {
+  canonical_id: 2670
+  carrier_name: "Cape"
+  carrier_attribute {
+    mccmnc_tuple: "314560"
+    gid1: "2273"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "302220"
+    mccmnc_tuple: "311588"
+    gid1: "2273"
+  }
+}
+carrier_id {
+  canonical_id: 2671
+  carrier_name: "Yobi Telecom"
+  carrier_attribute {
+    mccmnc_tuple: "334110"
+    spn: "YOBI"
+  }
+}
+carrier_id {
+  canonical_id: 2672
+  carrier_name: "R"
+  carrier_attribute {
+    mccmnc_tuple: "21403"
+    spn: "R"
+  }
+}
+carrier_id {
+  canonical_id: 2673
+  carrier_name: "Ericsson Test"
+  carrier_attribute {
+    mccmnc_tuple: "262800"
+  }
+}
+carrier_id {
+  canonical_id: 2674
+  carrier_name: "Telecable"
+  carrier_attribute {
+    mccmnc_tuple: "21403"
+    spn: "Telecable"
+  }
+}
+carrier_id {
+  canonical_id: 2675
+  carrier_name: "VOCUS-CN"
+  carrier_attribute {
+    mccmnc_tuple: "505023"
+    spn: "VOCUS"
+  }
+}
+carrier_id {
+  canonical_id: 2676
+  carrier_name: "PMCI"
+  carrier_attribute {
+    mccmnc_tuple: "55299"
+    spn: "PMCI"
+  }
+}
+carrier_id {
+  canonical_id: 2677
+  carrier_name: "netplus.ch"
+  carrier_attribute {
+    mccmnc_tuple: "22874"
+  }
+}
+carrier_id {
+  canonical_id: 2678
+  carrier_name: "One5G"
+  carrier_attribute {
+    mccmnc_tuple: "61908"
   }
 }
 carrier_id {
@@ -12763,4 +12878,4 @@ carrier_id {
   }
   parent_canonical_id: 1779
 }
-version: 134217771
+version: 134217773

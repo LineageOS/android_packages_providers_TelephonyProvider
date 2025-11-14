@@ -165,7 +165,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 76 << 16;
+    private static final int DATABASE_VERSION = 77 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -666,7 +666,9 @@ public class TelephonyProvider extends ContentProvider
                 + Telephony.SimInfo.COLUMN_SATELLITE_ENTITLEMENT_SERVICE_TYPE_MAP + " TEXT,"
                 + Telephony.SimInfo.COLUMN_SATELLITE_ENTITLEMENT_DATA_SERVICE_POLICY + " TEXT,"
                 + Telephony.SimInfo.COLUMN_SATELLITE_ENTITLEMENT_VOICE_SERVICE_POLICY + " TEXT,"
-                + Telephony.SimInfo.COLUMN_IS_PRIVATE_NETWORK + " INTEGER DEFAULT 0"
+                + Telephony.SimInfo.COLUMN_IS_PRIVATE_NETWORK + " INTEGER DEFAULT 0,"
+                + Telephony.SimInfo.COLUMN_STREAMING_APP_MAX_DOWNLINK_KBPS + " INTEGER DEFAULT -1,"
+                + Telephony.SimInfo.COLUMN_STREAMING_APP_MAX_UPLINK_KBPS + " INTEGER DEFAULT -1"
                 + ");";
     }
 
@@ -2280,6 +2282,26 @@ public class TelephonyProvider extends ContentProvider
                     }
                 }
                 oldVersion = 76 << 16 | 6;
+            }
+
+            if (oldVersion < (77 << 16 | 6)) {
+                try {
+                    // Try to update the siminfo table with new columns.
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + Telephony.SimInfo
+                            .COLUMN_STREAMING_APP_MAX_DOWNLINK_KBPS
+                            + "  INTEGER DEFAULT -1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + Telephony.SimInfo
+                            .COLUMN_STREAMING_APP_MAX_UPLINK_KBPS
+                            + "  INTEGER DEFAULT -1;");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade failed to update " + SIMINFO_TABLE
+                                + " to add phone numbers. ");
+                    }
+                }
+                oldVersion = 77 << 16 | 6;
             }
 
             if (DBG) {
@@ -4164,7 +4186,7 @@ public class TelephonyProvider extends ContentProvider
                 PersistableBundle backedUpSimInfoEntry, int backupDataFormatVersion,
                 String isoCountryCodeFromDb, String allowedNetworkTypesForReasonsFromDb,
                 List<String> wfcRestoreBlockedCountries) {
-            if (DATABASE_VERSION != 76 << 16) {
+            if (DATABASE_VERSION != 77 << 16) {
                 throw new AssertionError("The database schema has been updated which might make "
                     + "the format of #BACKED_UP_SIM_SPECIFIC_SETTINGS_FILE outdated. Make sure to "
                     + "1) review whether any of the columns in #SIM_INFO_COLUMNS_TO_BACKUP have "

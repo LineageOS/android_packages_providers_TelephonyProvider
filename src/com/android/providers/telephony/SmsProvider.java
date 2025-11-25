@@ -128,9 +128,20 @@ public class SmsProvider extends ContentProvider {
     };
     private static final TextClassifier.EntityConfig TC_REQUEST_CONFIG =
             new TextClassifier.EntityConfig.Builder()
-                    .setIncludedTypes(List.of(TextClassifier.TYPE_SMS_RETRIEVER_OTP))
+                    .setIncludedTypes(getIncludedTextClassifierTypes())
                     .includeTypesFromTextClassifier(false)
                     .build();
+
+    private static List<String> getIncludedTextClassifierTypes() {
+      List<String> includedTypes = List.of(TextClassifier.TYPE_SMS_RETRIEVER_OTP);
+      if (Flags.redactWebotpSms()) {
+          includedTypes.add(TextClassifier.TYPE_SMS_WEB_OTP);
+      }
+      if (Flags.redactGenericOtpSms()) {
+          includedTypes.add(TextClassifier.TYPE_OTP);
+      }
+      return includedTypes;
+    }
 
     private final List<UserHandle> mUsersRemovedBeforeUnlockList = new ArrayList<>();
 
@@ -1061,10 +1072,17 @@ public class SmsProvider extends ContentProvider {
                 int otpType = Sms.OTP_TYPE_NONE;
                 for (TextLinks.TextLink link : links.getLinks()) {
                     for (int i = 0; i < link.getEntityCount(); i++) {
-                        if (link.getEntity(i).equals(TextClassifier.TYPE_SMS_RETRIEVER_OTP)) {
+                        if (link.getEntity(i).equals(TextClassifier.TYPE_SMS_RETRIEVER_OTP)
+                            || (Flags.redactWebotpSms()
+                                  && link.getEntity(i).equals(TextClassifier.TYPE_SMS_WEB_OTP))
+                            || (Flags.redactGenericOtpSms()
+                                  && link.getEntity(i).equals(TextClassifier.TYPE_OTP))) {
                             otpType = Sms.OTP_TYPE_CONTAINS_OTP;
                             break;
                         }
+                    }
+                    if (otpType != Sms.OTP_TYPE_NONE) {
+                        break;
                     }
                 }
                 ContentValues values = new ContentValues();

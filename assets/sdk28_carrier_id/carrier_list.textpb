@@ -4955,7 +4955,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 1630
-  carrier_name: "Digi"
+  carrier_name: "CelcomDigi"
   carrier_attribute {
     mccmnc_tuple: "50210"
     mccmnc_tuple: "50216"
@@ -4983,7 +4983,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 1633
-  carrier_name: "Celcom"
+  carrier_name: "CelcomDigi"
   carrier_attribute {
     mccmnc_tuple: "50213"
     mccmnc_tuple: "50219"
@@ -13715,6 +13715,11 @@ carrier_id {
     gid1: "CC01"
     gid2: "CB"
   }
+  carrier_attribute {
+    mccmnc_tuple: "310240"
+    gid1: "CC01"
+    gid2: "CBFF"
+  }
 }
 carrier_id {
   canonical_id: 2684
@@ -13747,6 +13752,112 @@ carrier_id {
   carrier_attribute {
     mccmnc_tuple: "43411"
     spn: "Perfectum"
+  }
+}
+carrier_id {
+  canonical_id: 2689
+  carrier_name: "MTEL"
+  carrier_attribute {
+    mccmnc_tuple: "26225"
+  }
+}
+carrier_id {
+  canonical_id: 2690
+  carrier_name: "MTEL"
+  carrier_attribute {
+    mccmnc_tuple: "23220"
+  }
+}
+carrier_id {
+  canonical_id: 2691
+  carrier_name: "MTEL"
+  carrier_attribute {
+    mccmnc_tuple: "22869"
+  }
+}
+carrier_id {
+  canonical_id: 2692
+  carrier_name: "NOTA"
+  carrier_attribute {
+    mccmnc_tuple: "25061"
+    spn: "NOTA"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "25002"
+    spn: "NOTA"
+  }
+}
+carrier_id {
+  canonical_id: 2693
+  carrier_name: "VINOC"
+  carrier_attribute {
+    mccmnc_tuple: "334230"
+  }
+}
+carrier_id {
+  canonical_id: 2694
+  carrier_name: "XPhone"
+  carrier_attribute {
+    mccmnc_tuple: "42521"
+    spn: "xphone"
+  }
+}
+carrier_id {
+  canonical_id: 2695
+  carrier_name: "BakhmutTelecom"
+  carrier_attribute {
+    mccmnc_tuple: "255702"
+  }
+}
+carrier_id {
+  canonical_id: 2696
+  carrier_name: "Citymesh Connect"
+  carrier_attribute {
+    mccmnc_tuple: "20613"
+  }
+}
+carrier_id {
+  canonical_id: 2697
+  carrier_name: "Optima"
+  carrier_attribute {
+    mccmnc_tuple: "22210"
+    spn: "Optima"
+  }
+}
+carrier_id {
+  canonical_id: 2699
+  carrier_name: "Massima Energia"
+  carrier_attribute {
+    mccmnc_tuple: "22210"
+    spn: "Massima Energia"
+  }
+}
+carrier_id {
+  canonical_id: 2700
+  carrier_name: "GSMA VoLTE Test Profile#1"
+  carrier_attribute {
+    mccmnc_tuple: "111"
+  }
+}
+carrier_id {
+  canonical_id: 2701
+  carrier_name: "GSMA VoLTE Test Profile#2"
+  carrier_attribute {
+    mccmnc_tuple: "112"
+  }
+}
+carrier_id {
+  canonical_id: 2702
+  carrier_name: "GSMA VoLTE Test Profile#3"
+  carrier_attribute {
+    mccmnc_tuple: "113"
+  }
+}
+carrier_id {
+  canonical_id: 2703
+  carrier_name: "GSMA VoLTE Test Profile#4"
+  carrier_attribute {
+    mccmnc_tuple: "114"
   }
 }
 carrier_id {
@@ -13991,4 +14102,4 @@ carrier_id {
   }
   parent_canonical_id: 2023
 }
-version: 55
+version: 56

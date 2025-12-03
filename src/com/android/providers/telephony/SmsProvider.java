@@ -34,6 +34,7 @@ import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.MatrixCursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteDatabaseLockedException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
@@ -132,6 +133,10 @@ public class SmsProvider extends ContentProvider {
                     .includeTypesFromTextClassifier(false)
                     .build();
 
+    @VisibleForTesting
+    protected static final int MAX_DB_UPDATE_ATTEMPTS = 3;
+    private static final long DB_UPDATE_RETRY_DELAY_MS = 100;
+
     private static List<String> getIncludedTextClassifierTypes() {
       List<String> includedTypes = List.of(TextClassifier.TYPE_SMS_RETRIEVER_OTP);
       if (Flags.redactWebotpSms()) {
@@ -149,7 +154,8 @@ public class SmsProvider extends ContentProvider {
 
     private final Handler mMainThreadHandler = new Handler(Looper.getMainLooper());
 
-    private TextClassifier mTextClassifier;
+    @VisibleForTesting
+    protected TextClassifier mTextClassifier;
 
     @Override
     public boolean onCreate() {
@@ -1059,7 +1065,8 @@ public class SmsProvider extends ContentProvider {
         }
     }
 
-    private void scheduleOtpCheck(Uri uri, String text) {
+    @VisibleForTesting
+    protected void scheduleOtpCheck(Uri uri, String text) {
         mBackgroundExecutor.execute(() -> {
             try {
                 Trace.beginSection("scheduleOtpCheck");
@@ -1087,20 +1094,39 @@ public class SmsProvider extends ContentProvider {
                 }
                 ContentValues values = new ContentValues();
                 values.put(Sms.CONTAINS_OTP, otpType);
-                update(uri, values, null);
+                updateWithRetry(uri, values, "scheduleOtpCheck", 1);
+
                 if (otpType == Sms.OTP_TYPE_CONTAINS_OTP) {
                     // Schedule an update for when the OTP hiding time expires, to remove the "has
                     // otp" value. This is best-effort, not guaranteed.
                     mMainThreadHandler.postDelayed(() -> {
                         ContentValues unredacted = new ContentValues();
                         unredacted.put(Sms.CONTAINS_OTP, Sms.OTP_TYPE_NONE);
-                        update(uri, unredacted, null);
+                        updateWithRetry(uri, unredacted, "scheduleOtpCheck: unredact", 1);
                     }, OTP_HIDING_TIME_MS);
                 }
             } finally {
                 Trace.endSection();
             }
         });
+    }
+
+    private void updateWithRetry(Uri uri, ContentValues values, String operationName,
+            int currentAttempt) {
+        try {
+            update(uri, values, null);
+        } catch (SQLiteDatabaseLockedException e) {
+            if (currentAttempt < MAX_DB_UPDATE_ATTEMPTS) {
+                Log.w(TAG, operationName + ": Database locked. Attempt " + currentAttempt
+                        + " of " + MAX_DB_UPDATE_ATTEMPTS + " failed.");
+                mMainThreadHandler.postDelayed(()
+                                -> updateWithRetry(uri, values, operationName, currentAttempt + 1),
+                        DB_UPDATE_RETRY_DELAY_MS);
+            } else {
+                Log.e(TAG, operationName + ": Update failed. Database locked. Attempts: "
+                        + currentAttempt, e);
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")

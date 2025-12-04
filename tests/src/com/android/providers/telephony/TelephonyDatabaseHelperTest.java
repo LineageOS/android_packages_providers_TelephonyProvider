@@ -933,6 +933,21 @@ public final class TelephonyDatabaseHelperTest extends TelephonyTestBase {
                 Telephony.SimInfo.COLUMN_PHONE_NUMBER_SOURCE_TS43));
     }
 
+    @Test
+    public void databaseHelperOnUpgrade_hasIsPrivateNetworkField() {
+        Log.d(TAG, "databaseHelperOnUpgrade_hasIsPrivateNetworkField");
+        SQLiteDatabase db = mInMemoryDbHelper.getWritableDatabase();
+        mHelper.onUpgrade(db, (4 << 16), TelephonyProvider.getVersion(mContext));
+
+        // the upgraded db must have Telephony.SimInfo.COLUMN_IS_PRIVATE_NETWORK
+        Cursor cursor = db.query("siminfo", null, null, null, null, null, null);
+        String[] upgradedColumns = cursor.getColumnNames();
+        Log.d(TAG, "siminfo columns: " + Arrays.toString(upgradedColumns));
+
+        assertTrue(Arrays.asList(upgradedColumns).contains(
+                Telephony.SimInfo.COLUMN_IS_PRIVATE_NETWORK));
+    }
+
     /**
      * Helper for an in memory DB used to test the TelephonyProvider#DatabaseHelper.
      *

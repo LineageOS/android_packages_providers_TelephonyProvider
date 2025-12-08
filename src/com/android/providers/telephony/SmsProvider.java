@@ -133,7 +133,8 @@ public class SmsProvider extends ContentProvider {
                     .build();
 
     private static List<String> getIncludedTextClassifierTypes() {
-      List<String> includedTypes = List.of(TextClassifier.TYPE_SMS_RETRIEVER_OTP);
+      ArrayList<String> includedTypes = new ArrayList();
+      includedTypes.add(TextClassifier.TYPE_SMS_RETRIEVER_OTP);
       if (Flags.redactWebotpSms()) {
           includedTypes.add(TextClassifier.TYPE_SMS_WEB_OTP);
       }

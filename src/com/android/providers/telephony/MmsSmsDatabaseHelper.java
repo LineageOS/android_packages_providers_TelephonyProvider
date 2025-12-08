@@ -266,7 +266,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 69;
+    static final int DATABASE_VERSION = 70;
     private static final int IDLE_CONNECTION_TIMEOUT_MS = 30000;
 
     private final Context mContext;
@@ -1090,6 +1090,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "END;");
     }
 
+    // N.B.: Whenever the columns here are changed, the columns in
+    // {@ref MmsSmsProvider} must be changed to match.
     @VisibleForTesting
     public static String CREATE_SMS_TABLE_STRING =
             "CREATE TABLE sms (" +
@@ -1114,7 +1116,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             "sub_id INTEGER DEFAULT " + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
             "error_code INTEGER DEFAULT " + NO_ERROR_CODE + ", " +
             "creator TEXT," +
-            "seen INTEGER DEFAULT 0" +
+            "seen INTEGER DEFAULT 0," +
+            "contains_otp INTEGER DEFAULT 0" +
             ");";
 
     @VisibleForTesting
@@ -1837,6 +1840,21 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             } finally {
                 db.endTransaction();
             }
+            // fall through
+        case 69:
+            if (currentVersion <= 69) {
+                return;
+            }
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion70(db, oldVersion, currentVersion);
+                db.setTransactionSuccessful();
+            } catch(Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break; // force to destroy all old data;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -2185,6 +2203,19 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "[upgradeDatabaseToVersion68] Exception adding column "
                     + "sub_id; " + e);
             logException(e, oldVersion, currentVersion, 68);
+        }
+    }
+
+    private void upgradeDatabaseToVersion70(SQLiteDatabase db, int oldVersion, int currentVersion) {
+        try {
+            if (!isColumnExists(db, SmsProvider.TABLE_SMS, Sms.CONTAINS_OTP)) {
+                db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS
+                        + " ADD COLUMN " + Sms.CONTAINS_OTP
+                        + " INTEGER DEFAULT 0");
+            }
+        } catch (SQLiteException e) {
+            Log.e(TAG, "[upgradeDatabaseToVersion70] Exception adding column contains_otp; " + e);
+            logException(e, oldVersion, currentVersion, 70);
         }
     }
 

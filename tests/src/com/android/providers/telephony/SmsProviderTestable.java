@@ -35,8 +35,26 @@ public class SmsProviderTestable extends SmsProvider {
 
     // close mDbHelper database object
     protected void closeDatabase() {
-        mCeOpenHelper.close();
-        mDeOpenHelper.close();
+        if (mCeOpenHelper != null) {
+            mCeOpenHelper.close();
+        }
+        if (mDeOpenHelper != null) {
+            mDeOpenHelper.close();
+        }
+    }
+
+    // Testable SmsProvider doesn't enforce OTP restrictions, as doing so requires elevated
+    // permissions the test version of the provider doesn't have.
+    @Override
+    protected boolean canReadOtpSms(int uid, String packageName) {
+        return true;
+    }
+
+    // Testable SmsProvider doesn't enforce raw table restrictions, as doing so requires elevated
+    // permissions the test version of the provider doesn't have.
+    @Override
+    protected boolean canReadRawTable(int uid, String packageName) {
+        return true;
     }
 
     /**

@@ -664,32 +664,41 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
      * @throws Exception
      */
     public void testRestoreSms_WithException() throws Exception {
-        mTelephonyBackupAgent.initUnknownSender();
-        PhoneFactory.addLocalLog("DeferredSmsMmsRestoreService", 1);
-        JsonReader jsonReader = new JsonReader(new StringReader(addRandomDataToJson(mAllSmsJson)));
-        FakeSmsProvider smsProvider = new FakeSmsProvider(mSmsRows, false);
-        mMockContentResolver.addProvider("sms", smsProvider);
-        TelephonyBackupAgent.SmsProviderQuery smsProviderQuery =
-                new TelephonyBackupAgent.SmsProviderQuery() {
-                    int mIteration = 0;
-                    @Override
-                    public boolean doesSmsExist(ContentValues smsValues) {
-                        if (mIteration == 0) {
-                            mIteration++;
-                            throw new RuntimeException("fake crash for first message");
-                        }
-                        return false;
-                    }
-        };
-        TelephonyBackupAgent.SmsProviderQuery previousQuery =
-                mTelephonyBackupAgent.getAndSetSmsProviderQuery(smsProviderQuery);
+        final String key = "DeferredSmsMmsRestoreService";
+        PhoneFactory.removeLocalLogForTest(key);
         try {
-            mTelephonyBackupAgent.putSmsMessagesToProvider(jsonReader);
-            // the "- 1" is due to exception thrown for one of the messages
-            assertEquals(mSmsRows.length - 1, smsProvider.getRowsAdded());
-            assertEquals(mThreadProvider.mIsThreadArchived, mThreadProvider.mUpdateThreadsArchived);
+            mTelephonyBackupAgent.initUnknownSender();
+            PhoneFactory.addLocalLog(key, 1);
+            JsonReader jsonReader = new JsonReader(
+                    new StringReader(addRandomDataToJson(mAllSmsJson)));
+            FakeSmsProvider smsProvider = new FakeSmsProvider(mSmsRows, false);
+            mMockContentResolver.addProvider("sms", smsProvider);
+            TelephonyBackupAgent.SmsProviderQuery smsProviderQuery =
+                    new TelephonyBackupAgent.SmsProviderQuery() {
+                        int mIteration = 0;
+
+                        @Override
+                        public boolean doesSmsExist(ContentValues smsValues) {
+                            if (mIteration == 0) {
+                                mIteration++;
+                                throw new RuntimeException("fake crash for first message");
+                            }
+                            return false;
+                        }
+                    };
+            TelephonyBackupAgent.SmsProviderQuery previousQuery =
+                    mTelephonyBackupAgent.getAndSetSmsProviderQuery(smsProviderQuery);
+            try {
+                mTelephonyBackupAgent.putSmsMessagesToProvider(jsonReader);
+                // the "- 1" is due to exception thrown for one of the messages
+                assertEquals(mSmsRows.length - 1, smsProvider.getRowsAdded());
+                assertEquals(mThreadProvider.mIsThreadArchived,
+                        mThreadProvider.mUpdateThreadsArchived);
+            } finally {
+                mTelephonyBackupAgent.getAndSetSmsProviderQuery(previousQuery);
+            }
         } finally {
-            mTelephonyBackupAgent.getAndSetSmsProviderQuery(previousQuery);
+            PhoneFactory.removeLocalLogForTest(key);
         }
     }
 

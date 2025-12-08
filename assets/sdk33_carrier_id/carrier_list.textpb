@@ -2461,7 +2461,6 @@ carrier_id {
   carrier_name: "One Telecommunications"
   carrier_attribute {
     mccmnc_tuple: "27601"
-    gid1: "01"
   }
 }
 carrier_id {
@@ -4356,7 +4355,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 1609
-  carrier_name: "Nov Operator"
+  carrier_name: "A1"
   carrier_attribute {
     mccmnc_tuple: "29403"
   }
@@ -5518,7 +5517,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 1771
-  carrier_name: "Vodafone"
+  carrier_name: "Epic Maritime"
   carrier_attribute {
     mccmnc_tuple: "90119"
   }
@@ -9789,6 +9788,10 @@ carrier_id {
     mccmnc_tuple: "22210"
     spn: "PosteMobile"
   }
+  carrier_attribute {
+    mccmnc_tuple: "22233"
+    spn: "PosteMobile"
+  }
 }
 carrier_id {
   canonical_id: 2304
@@ -11286,6 +11289,14 @@ carrier_id {
     mccmnc_tuple: "302220"
     gid1: "6530"
   }
+  carrier_attribute {
+    mccmnc_tuple: "313350"
+    gid1: "6530"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "313360"
+    gid1: "6530"
+  }
 }
 carrier_id {
   canonical_id: 2518
@@ -11300,6 +11311,14 @@ carrier_id {
   }
   carrier_attribute {
     mccmnc_tuple: "302220"
+    gid1: "6332"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "313350"
+    gid1: "6332"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "313360"
     gid1: "6332"
   }
 }
@@ -13037,6 +13056,62 @@ carrier_id {
   }
 }
 carrier_id {
+  canonical_id: 2679
+  carrier_name: "SolNet"
+  carrier_attribute {
+    mccmnc_tuple: "22872"
+    spn: "SolNet"
+  }
+}
+carrier_id {
+  canonical_id: 2680
+  carrier_name: "Spusu DE"
+  carrier_attribute {
+    mccmnc_tuple: "26221"
+  }
+}
+carrier_id {
+  canonical_id: 2681
+  carrier_name: "PTV Telecom"
+  carrier_attribute {
+    mccmnc_tuple: "21415"
+    spn: "PTV Telecom"
+  }
+}
+carrier_id {
+  canonical_id: 2682
+  carrier_name: "Bouygues B2B"
+  carrier_attribute {
+    mccmnc_tuple: "20820"
+    imsi_prefix_xpattern: "20820260"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "20820"
+    imsi_prefix_xpattern: "20820261"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "20820"
+    imsi_prefix_xpattern: "20820262"
+  }
+}
+carrier_id {
+  canonical_id: 2683
+  carrier_name: "Comcast Business"
+  carrier_attribute {
+    mccmnc_tuple: "310240"
+    gid1: "CC01"
+    gid2: "CB"
+  }
+}
+carrier_id {
+  canonical_id: 2684
+  carrier_name: "Mucho"
+  carrier_attribute {
+    mccmnc_tuple: "22858"
+    spn: "Mucho"
+  }
+}
+carrier_id {
   canonical_id: 10000
   carrier_name: "Tracfone-ATT"
   carrier_attribute {
@@ -13412,4 +13487,4 @@ carrier_id {
   }
   parent_canonical_id: 2560
 }
-version: 100663341
+version: 100663342

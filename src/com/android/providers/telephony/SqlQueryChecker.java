@@ -49,4 +49,15 @@ public class SqlQueryChecker {
         SQLiteTokenizer.tokenize(sortOrder, SQLiteTokenizer.OPTION_NONE,
                 SqlQueryChecker::checkToken);
     }
+
+    /**
+     * Check the selection's bracketing, throwing an {@link IllegalArgumentException} if
+     * it is invalid. An invalid selection string could have unbalanced parentheses
+     * or attempt to break out of the intended boolean structure, potentially leading to
+     * SQL injection vulnerabilities.
+     */
+    static void checkSelection(String selection) {
+        Log.v("MmsProvider", "inside checkSelection checking sel: " + selection);
+        SQLiteTokenizer.tokenize(selection, SQLiteTokenizer.OPTION_CHECK_BRACKETS, null);
+    }
 }

@@ -30,11 +30,17 @@ import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.content.res.Resources;
 import android.database.ContentObserver;
+import android.database.Cursor;
 import android.net.Uri;
 import android.provider.Telephony;
 import android.telephony.TelephonyManager;
 import android.test.mock.MockContentResolver;
 import android.util.Log;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import junit.framework.TestCase;
 
@@ -42,11 +48,16 @@ import org.junit.Test;
 
 public class MmsProviderTest extends TestCase {
     private static final String TAG = "MmsProviderTest";
+    private static final String PARTS_DIR_NAME = "parts";
+    private File testDir;
+    private File partsDir;
 
     private MockContentResolver mContentResolver;
     private MmsProviderTestable mMmsProviderTestable;
 
     private int notifyChangeCount;
+
+    private Context context;
 
     @Override
     protected void setUp() throws Exception {
@@ -55,7 +66,7 @@ public class MmsProviderTest extends TestCase {
         mMmsProviderTestable = new MmsProviderTestable();
 
         // setup mocks
-        Context context = mock(Context.class);
+        context = mock(Context.class);
         PackageManager packageManager = mock(PackageManager.class);
         Resources resources = mock(Resources.class);
         when(context.getSystemService(eq(Context.APP_OPS_SERVICE)))
@@ -98,12 +109,27 @@ public class MmsProviderTest extends TestCase {
         mContentResolver.addProvider("mms", mMmsProviderTestable);
         Log.d(TAG, "MockContextWithProvider: Add MmsProvider to mResolver");
         notifyChangeCount = 0;
+
+        //Setup test directory
+        testDir = Files.createTempDirectory("testDir").toFile();
+        partsDir = new File(testDir, PARTS_DIR_NAME);
+        partsDir.mkdirs(); // Create the parts directory
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
         mMmsProviderTestable.closeDatabase();
+
+        if (testDir != null && testDir.exists()) {
+            File[] files = testDir.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    file.delete();
+                }
+            }
+            testDir.delete();
+        }
     }
 
     @Test
@@ -115,6 +141,32 @@ public class MmsProviderTest extends TestCase {
 
         assertEquals(expected, actual);
         assertEquals(1, notifyChangeCount);
+    }
+
+    @Test
+    public void testDeleteDataRows_pathStartsWithPartsDirectory_canDeleteFile() throws Exception {
+        // Create a file in the parts directory.
+        when(context.getDir(eq(PARTS_DIR_NAME), anyInt())).thenReturn(partsDir);
+        File validFile = new File(partsDir, "mms_part.txt");
+        validFile.createNewFile();
+
+        boolean canDeleteFile = MmsProviderTestable.isFilePathCanonical(
+                context, validFile);
+
+        assertTrue(canDeleteFile);
+    }
+
+    @Test
+    public void testDeleteDataRows_invalidPath_cannotDeleteFile() throws Exception {
+        // Create a file in the test directory, which is not under the parts directory.
+        when(context.getDir(eq(PARTS_DIR_NAME), anyInt())).thenReturn(partsDir);
+        File invalidFile = new File(testDir, "not_mms.txt");
+        invalidFile.createNewFile();
+
+        boolean canDeleteFile = MmsProviderTestable.isFilePathCanonical(
+                context, invalidFile);
+
+        assertFalse(canDeleteFile);
     }
 
     @Test
@@ -145,5 +197,66 @@ public class MmsProviderTest extends TestCase {
         values.put(Telephony.Mms.TEXT_ONLY, 1);
         values.put(Telephony.Mms.THREAD_ID, 1);
         return values;
+    }
+
+    @Test
+    public void testQuery_withUnbalancedParentheses_throwsIllegalArgumentException() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String[] projection = new String[]{"_id"};
+        // Verify to check for unbalanced parentheses
+        String maliciousSelection = "1=1) OR (1=1";
+
+        Cursor cursor = mMmsProviderTestable.query(testUri, projection, maliciousSelection, null,
+                null);
+        assertNull("Cursor should be null due to caught exception for unbalanced parentheses",
+                cursor);
+    }
+
+    @Test
+    public void testQuery_withMaliciousClosingParenthesis_throwsIllegalArgumentException() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String[] projection = new String[]{"_id"};
+        // Verify to check for a closing parenthesis at the beginning
+        String maliciousSelection = ") OR (1=1";
+
+        Cursor cursor = mMmsProviderTestable.query(testUri, projection, maliciousSelection, null,
+                null);
+        assertNull("Cursor should be null due to caught exception for unbalanced parentheses",
+                cursor);
+    }
+
+    @Test
+    public void testQuery_withProperlyBalancedParentheses_doesNotReturnNull() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String[] projection = new String[]{"_id"};
+        String[] normalSelections = {
+                "(thread_id=1)", // Original test
+                "",              // New: Empty selection
+                "thread_id=1"    // New: Selection without parentheses
+        };
+
+        for (String selection : normalSelections) {
+            Cursor cursor = null;
+            try {
+                cursor = mMmsProviderTestable.query(testUri, projection, selection, null, null);
+                assertNotNull("Cursor should not be null for selection: \"" + selection + "\"",
+                        cursor);
+                Log.i(TAG,
+                        "Query with selection: \"" + selection + "\" returned cursor: " + cursor);
+            } catch (IllegalArgumentException e) {
+                if (e.getMessage() != null && e.getMessage().contains("Unbalanced brackets")) {
+                    fail("Should not have thrown IllegalArgumentException for selection '"
+                            + selection + "': " + e.getMessage());
+                }
+                Log.e(TAG, "Unexpected IllegalArgumentException for selection '" + selection + "'",
+                        e);
+                fail("Unexpected IllegalArgumentException for selection '" + selection + "': "
+                        + e.getMessage());
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        }
     }
 }

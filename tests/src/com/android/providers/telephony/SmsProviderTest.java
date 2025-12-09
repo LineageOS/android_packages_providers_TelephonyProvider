@@ -16,6 +16,8 @@
 
 package com.android.providers.telephony;
 
+import static com.android.compatibility.common.util.SystemUtil.eventually;
+
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.eq;
@@ -42,6 +44,7 @@ import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.test.mock.MockContentResolver;
 import android.util.Log;
+import android.view.textclassifier.TextClassificationManager;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
@@ -147,6 +150,9 @@ public class SmsProviderTest extends TestCase {
         mSmsProviderTestable.attachInfoForTesting(mContext, providerInfo);
         Log.d(TAG, "MockContextWithProvider: smsProvider.getContext(): "
                 + mSmsProviderTestable.getContext());
+
+        mSmsProviderTestable.mTextClassifier = mContext.getSystemService(
+                        TextClassificationManager.class).getTextClassifier();
 
         // Add given SmsProvider to mResolver with authority="sms" so that
         // mResolver can send queries to mSmsProvider
@@ -348,6 +354,40 @@ public class SmsProviderTest extends TestCase {
             } catch (Exception e) {
                 Log.e(TAG, "Failed to drop sms_restricted view after test.", e);
             }
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testOtpUpdate_whenDbLocked_retries() {
+        try {
+            mSmsProviderTestable.mLockedExceptionCountToSimulate = 1;
+            mSmsProviderTestable.mUpdateCallCount = 0;
+            mSmsProviderTestable.scheduleOtpCheck(Uri.parse("content://sms/1"),
+                    "Your OTP code is 123456");
+            eventually(() ->
+                    assertEquals(2, mSmsProviderTestable.mUpdateCallCount)
+            );
+        } finally {
+            mSmsProviderTestable.mLockedExceptionCountToSimulate = 0;
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testOtpUpdate_whenRetryLimitExceeded_stopsGracefully() {
+        try {
+            mSmsProviderTestable.mLockedExceptionCountToSimulate =
+                    SmsProvider.MAX_DB_UPDATE_ATTEMPTS + 1;
+            mSmsProviderTestable.mUpdateCallCount = 0;
+            mSmsProviderTestable.scheduleOtpCheck(Uri.parse("content://sms/1"),
+                    "Your OTP code is 123456");
+            eventually(() ->
+                    assertEquals(SmsProvider.MAX_DB_UPDATE_ATTEMPTS,
+                            mSmsProviderTestable.mUpdateCallCount)
+            );
+        } finally {
+            mSmsProviderTestable.mLockedExceptionCountToSimulate = 0;
         }
     }
 

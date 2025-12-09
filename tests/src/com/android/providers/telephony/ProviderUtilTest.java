@@ -22,8 +22,10 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import android.app.AppOpsManager;
 import android.content.Context;
 import android.os.UserHandle;
+import android.os.Process;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
@@ -49,8 +51,13 @@ public class ProviderUtilTest {
     private SubscriptionManager mSubscriptionManager;
     @Mock
     private TelephonyManager mTelephonyManager;
+    @Mock
+    private AppOpsManager mAppOpsManager;
 
     private Map<Integer, List<EmergencyNumber>> mEmergencyNumberList;
+
+    private static final String EXAMPLE_PACKAGE_NAME = "com.example.app";
+    private static final int EXAMPLE_PACKAGE_UID = 21001;
 
     @Before
     public void setUp() throws Exception {
@@ -59,6 +66,7 @@ public class ProviderUtilTest {
 
         when(mContext.getSystemService(SubscriptionManager.class)).thenReturn(mSubscriptionManager);
         when(mContext.getSystemService(TelephonyManager.class)).thenReturn(mTelephonyManager);
+        when(mContext.getSystemService(AppOpsManager.class)).thenReturn(mAppOpsManager);
     }
 
     @After
@@ -144,6 +152,58 @@ public class ProviderUtilTest {
 
         assertThat(ProviderUtil.getSelectionByEmergencyNumbers(mContext))
                 .isEqualTo("address IN ('911','112')");
+    }
+
+    @Test
+    public void canReadRestrictedMessages_systemUid_returnsTrue() {
+        assertThat(ProviderUtil.canReadRestrictedMessages(mContext, mContext.getPackageName(),
+                Process.SYSTEM_UID)).isTrue();
+    }
+
+    @Test
+    public void canReadRestrictedMessages_packageNoAppOpGranted_returnsFalse() {
+        when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_READ_RESTRICTED_MESSAGES,
+                EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
+                    AppOpsManager.MODE_IGNORED);
+
+        assertThat(ProviderUtil.canReadRestrictedMessages(mContext, EXAMPLE_PACKAGE_NAME,
+                EXAMPLE_PACKAGE_UID)).isFalse();
+    }
+
+    @Test
+    public void canReadRestrictedMessages_packageWithAppOpGranted_returnsTrue() {
+        when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_READ_RESTRICTED_MESSAGES,
+                EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
+                    AppOpsManager.MODE_ALLOWED);
+
+        assertThat(ProviderUtil.canReadRestrictedMessages(mContext, EXAMPLE_PACKAGE_NAME,
+                EXAMPLE_PACKAGE_UID)).isTrue();
+    }
+
+    @Test
+    public void canWriteRestrictedMessages_systemUid_returnsTrue() {
+        assertThat(ProviderUtil.canWriteRestrictedMessages(mContext, mContext.getPackageName(),
+                Process.SYSTEM_UID)).isTrue();
+    }
+
+    @Test
+    public void canWriteRestrictedMessages_packageNoAppOpGranted_returnsFalse() {
+        when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES,
+                EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
+                    AppOpsManager.MODE_IGNORED);
+
+        assertThat(ProviderUtil.canWriteRestrictedMessages(mContext, EXAMPLE_PACKAGE_NAME,
+                EXAMPLE_PACKAGE_UID)).isFalse();
+    }
+
+    @Test
+    public void canWriteRestrictedMessages_packageWithAppOpGranted_returnsTrue() {
+        when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES,
+                EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
+                    AppOpsManager.MODE_ALLOWED);
+
+        assertThat(ProviderUtil.canWriteRestrictedMessages(mContext, EXAMPLE_PACKAGE_NAME,
+                EXAMPLE_PACKAGE_UID)).isTrue();
     }
 
     @Test

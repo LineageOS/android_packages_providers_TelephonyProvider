@@ -19,6 +19,7 @@ package com.android.providers.telephony;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
+import android.app.AppOpsManager;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
@@ -64,6 +65,40 @@ public class ProviderUtil {
     public static boolean isAccessRestricted(Context context, String packageName, int uid) {
         return (!TelephonyPermissions.isSystemOrPhone(uid)
                 && !SmsApplication.isDefaultSmsApplication(context, packageName));
+    }
+
+    /**
+     * Check if a caller of the provider can read restricted messages.
+     *
+     * @param context the context to use
+     * @param packageName the caller package name
+     * @param uid the caller uid
+     * @return true if the caller is system or phone, or has the app op, false otherwise
+     */
+    public static boolean canReadRestrictedMessages(Context context, String packageName, int uid) {
+        if(TelephonyPermissions.isSystemOrPhone(uid)) {
+            return true;
+        }
+        int op = context.getSystemService(AppOpsManager.class).noteOpNoThrow(
+                AppOpsManager.OP_READ_RESTRICTED_MESSAGES, uid, packageName, null, null);
+        return op == AppOpsManager.MODE_ALLOWED;
+    }
+
+    /**
+     * Check if a caller of the provider can write restricted messages.
+     *
+     * @param context the context to use
+     * @param packageName the caller package name
+     * @param uid the caller uid
+     * @return true if the caller is system or phone, or has the app op, false otherwise
+     */
+    public static boolean canWriteRestrictedMessages(Context context, String packageName, int uid) {
+        if(TelephonyPermissions.isSystemOrPhone(uid)) {
+            return true;
+        }
+        int op = context.getSystemService(AppOpsManager.class).noteOpNoThrow(
+                AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES, uid, packageName, null, null);
+        return op == AppOpsManager.MODE_ALLOWED;
     }
 
     /**

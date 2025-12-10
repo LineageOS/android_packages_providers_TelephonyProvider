@@ -15,8 +15,11 @@
  */
 package com.android.providers.telephony;
 
+import android.content.ContentValues;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteDatabaseLockedException;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.net.Uri;
 import android.util.Log;
 
 /**
@@ -24,6 +27,10 @@ import android.util.Log;
  */
 public class SmsProviderTestable extends SmsProvider {
     private static final String TAG = "SmsProviderTestable";
+
+    protected int mUpdateCallCount;
+
+    protected int mLockedExceptionCountToSimulate;
 
     @Override
     public boolean onCreate() {
@@ -55,6 +62,15 @@ public class SmsProviderTestable extends SmsProvider {
     @Override
     protected boolean canReadRawTable(int uid, String packageName) {
         return true;
+    }
+
+    @Override
+    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+        mUpdateCallCount += 1;
+        if (mUpdateCallCount <= mLockedExceptionCountToSimulate) {
+            throw new SQLiteDatabaseLockedException();
+        }
+        return super.update(uri, values, selection, selectionArgs);
     }
 
     /**

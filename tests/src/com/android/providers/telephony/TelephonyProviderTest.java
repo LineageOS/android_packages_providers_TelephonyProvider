@@ -276,6 +276,10 @@ public class TelephonyProviderTest {
         contentValues.put(SimInfo.COLUMN_SATELLITE_ENTITLEMENT_VOICE_SERVICE_POLICY,
                 arbitraryStringVal);
         contentValues.put(SimInfo.COLUMN_IS_PRIVATE_NETWORK, arbitraryIntVal);
+        contentValues.put(SimInfo.COLUMN_STREAMING_APP_MAX_DOWNLINK_KBPS,
+                arbitraryStringVal);
+        contentValues.put(SimInfo.COLUMN_STREAMING_APP_MAX_UPLINK_KBPS,
+                arbitraryStringVal);
         return contentValues;
     }
 
@@ -784,6 +788,8 @@ public class TelephonyProviderTest {
         final String insertSatelliteEntitlementVoiceServicePolicy = "exampleVoiceServicePolicy";
         final String insertNumberFromTs43 = "123456789";
         final int insertIsPrivateNetwork = 1;
+        final int downlinkBandwidth = 100000;
+        final int uplinkBandwidth = 1000;
         contentValues.put(SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID, insertSubId);
         contentValues.put(SubscriptionManager.DISPLAY_NAME, insertDisplayName);
         contentValues.put(SubscriptionManager.CARRIER_NAME, insertCarrierName);
@@ -817,6 +823,8 @@ public class TelephonyProviderTest {
                 insertSatelliteEntitlementVoiceServicePolicy);
         contentValues.put(SimInfo.COLUMN_PHONE_NUMBER_SOURCE_TS43, insertNumberFromTs43);
         contentValues.put(SubscriptionManager.IS_PRIVATE_NETWORK, insertIsPrivateNetwork);
+        contentValues.put(SimInfo.COLUMN_STREAMING_APP_MAX_DOWNLINK_KBPS, downlinkBandwidth);
+        contentValues.put(SimInfo.COLUMN_STREAMING_APP_MAX_UPLINK_KBPS, uplinkBandwidth);
 
         Log.d(TAG, "testSimTable Inserting contentValues: " + contentValues);
         mContentResolver.insert(SimInfo.CONTENT_URI, contentValues);
@@ -845,7 +853,9 @@ public class TelephonyProviderTest {
             SubscriptionManager.SATELLITE_ENTITLEMENT_DATA_SERVICE_POLICY,
             SubscriptionManager.SATELLITE_ENTITLEMENT_VOICE_SERVICE_POLICY,
             Telephony.SimInfo.COLUMN_PHONE_NUMBER_SOURCE_TS43,
-            SubscriptionManager.IS_PRIVATE_NETWORK
+            SubscriptionManager.IS_PRIVATE_NETWORK,
+            SubscriptionManager.STREAMING_APP_MAX_DOWNLINK_KBPS,
+            SubscriptionManager.STREAMING_APP_MAX_UPLINK_KBPS,
         };
         final String selection = SubscriptionManager.DISPLAY_NAME + "=?";
         String[] selectionArgs = { insertDisplayName };
@@ -880,6 +890,8 @@ public class TelephonyProviderTest {
         final String resultSatelliteEntitlementVoiceServicePolicy = cursor.getString(19);
         final String resultNumberFromTs43 = cursor.getString(20);
         final int resultIsPrivateNetwork = cursor.getInt(21);
+        final int resultDownlinkBandwidth = cursor.getInt(22);
+        final int resultUplinkBandwidth = cursor.getInt(23);
         assertEquals(insertSubId, resultSubId);
         assertEquals(insertCarrierName, resultCarrierName);
         assertEquals(insertCardId, resultCardId);
@@ -906,7 +918,8 @@ public class TelephonyProviderTest {
                 resultSatelliteEntitlementVoiceServicePolicy);
         assertEquals(insertNumberFromTs43, resultNumberFromTs43);
         assertEquals(insertIsPrivateNetwork, resultIsPrivateNetwork);
-
+        assertEquals(downlinkBandwidth, resultDownlinkBandwidth);
+        assertEquals(uplinkBandwidth, resultUplinkBandwidth);
 
         // delete test content
         final String selectionToDelete = SubscriptionManager.DISPLAY_NAME + "=?";

@@ -948,6 +948,27 @@ public final class TelephonyDatabaseHelperTest extends TelephonyTestBase {
                 Telephony.SimInfo.COLUMN_IS_PRIVATE_NETWORK));
     }
 
+    @Test
+    public void databaseHelperOnUpgrade_hasStreamingAppMaxRateFields() {
+        Log.d(TAG, "databaseHelperOnUpgrade_hasStreamingAppMaxRateFields");
+        // (5 << 16 | 6) is the first upgrade trigger in onUpgrade
+        SQLiteDatabase db = mInMemoryDbHelper.getWritableDatabase();
+        mHelper.onUpgrade(db, (4 << 16), TelephonyProvider.getVersion(mContext));
+
+        // the upgraded db must have
+        // Telephony.SimInfo.COLUMN_STREAMING_APP_MAX_DOWNLINK_KBPS and
+        // Telephony.SimInfo.COLUMN_STREAMING_APP_MAX_UPLINK_KBPS
+        Cursor cursor = db.query("siminfo", null, null, null, null, null, null);
+        String[] upgradedColumns = cursor.getColumnNames();
+        Log.d(TAG, "siminfo columns: " + Arrays.toString(upgradedColumns));
+
+        List<String> columnsList = Arrays.asList(upgradedColumns);
+        assertTrue(columnsList.contains(
+                Telephony.SimInfo.COLUMN_STREAMING_APP_MAX_DOWNLINK_KBPS));
+        assertTrue(columnsList.contains(
+                Telephony.SimInfo.COLUMN_STREAMING_APP_MAX_UPLINK_KBPS));
+    }
+
     /**
      * Helper for an in memory DB used to test the TelephonyProvider#DatabaseHelper.
      *

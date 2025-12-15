@@ -140,10 +140,10 @@ public class SmsProvider extends ContentProvider {
     private static List<String> getIncludedTextClassifierTypes() {
       ArrayList<String> includedTypes = new ArrayList();
       includedTypes.add(TextClassifier.TYPE_SMS_RETRIEVER_OTP);
-      if (Flags.redactWebotpSms()) {
+      if (android.view.flags.Flags.redactWebOtpSmsApi()) {
           includedTypes.add(TextClassifier.TYPE_SMS_WEB_OTP);
       }
-      if (Flags.redactGenericOtpSms()) {
+      if (android.view.flags.Flags.redactOtpAppCompatApi()) {
           includedTypes.add(TextClassifier.TYPE_OTP);
       }
       return includedTypes;
@@ -1081,9 +1081,9 @@ public class SmsProvider extends ContentProvider {
                 for (TextLinks.TextLink link : links.getLinks()) {
                     for (int i = 0; i < link.getEntityCount(); i++) {
                         if (link.getEntity(i).equals(TextClassifier.TYPE_SMS_RETRIEVER_OTP)
-                            || (Flags.redactWebotpSms()
+                            || (android.view.flags.Flags.redactWebOtpSmsApi()
                                   && link.getEntity(i).equals(TextClassifier.TYPE_SMS_WEB_OTP))
-                            || (Flags.redactGenericOtpSms()
+                            || (android.view.flags.Flags.redactOtpAppCompatApi()
                                   && link.getEntity(i).equals(TextClassifier.TYPE_OTP))) {
                             otpType = Sms.OTP_TYPE_CONTAINS_OTP;
                             break;

@@ -21,6 +21,7 @@ import android.annotation.NonNull;
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.app.AppOpsManager;
+import android.app.compat.CompatChanges;
 import android.content.BroadcastReceiver;
 import android.content.ContentProvider;
 import android.content.ContentResolver;
@@ -497,14 +498,21 @@ public class SmsProvider extends ContentProvider {
                 long pendingOtpCutoff = startOfCurrentSecondInMs - OTP_CLASSIFICATION_TIMEOUT_MS;
                 @SuppressLint("DefaultLocale")
                 final StringBuilder where = new StringBuilder(String.format(
-                        "%s = %d OR %s < %d OR (%s = %d AND %s < %d)",
-                        Sms.CONTAINS_OTP, Sms.OTP_TYPE_NONE, Sms.DATE, otpCutoff,
-                        Sms.CONTAINS_OTP, Sms.OTP_TYPE_PENDING, Sms.DATE, pendingOtpCutoff));
+                        " %s OR %s < %d OR (%s AND %s < %d)",
+                        getContainsOtpSqlFilter(Sms.OTP_TYPE_NONE), Sms.DATE, otpCutoff,
+                        getContainsOtpSqlFilter(Sms.OTP_TYPE_PENDING), Sms.DATE, pendingOtpCutoff));
                 final String hash = PackageBasedTokenUtil.generatePackageBasedToken(
                         getContext().getPackageManager(), callingPackage, callerUserHandle);
                 if (hash != null) {
                     where.append(String.format(" OR (%s LIKE '%%%s%%')",
                             Sms.BODY, hash));
+                }
+                // Note: For backwards compatibility, we allow packages with
+                // targetSdk < CINNAMON_BUN to read generic OTP messages.
+                if (android.view.flags.Flags.redactOtpAppCompatApi()
+                        && !CompatChanges.isChangeEnabled(SmsManager.FILTER_GENERIC_OTP,
+                                callingPackage, Binder.getCallingUserHandle())) {
+                  where.append(String.format(" OR %s", getContainsGenericOtpSqlFilter()));
                 }
                 qb.appendWhereStandalone(where.toString());
             }
@@ -518,6 +526,23 @@ public class SmsProvider extends ContentProvider {
         } finally {
             Trace.endSection();
         }
+    }
+
+    private String getContainsOtpSqlFilter(int containsOtpType) {
+        if (android.view.flags.Flags.redactOtpAppCompatApi()) {
+            return String.format("((%s & %d) = %d)",
+                   Telephony.Sms.CONTAINS_OTP, Telephony.Sms.OTP_TYPE_MASK, containsOtpType);
+        }
+        return String.format("(%s = %d)", Telephony.Sms.CONTAINS_OTP, containsOtpType);
+    }
+
+    private String getContainsGenericOtpSqlFilter() {
+        // Generic OTP is an OTP that does not follow standards defined by either
+        // SMS Hash Retriever standards or Web OTP standards.
+        return String.format("((%s & %s) = %s)",
+               Telephony.Sms.CONTAINS_OTP,
+               Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
+               Telephony.Sms.OTP_SUBTYPE_NONE | Telephony.Sms.OTP_TYPE_CONTAINS_OTP);
     }
 
     /**
@@ -1163,27 +1188,48 @@ public class SmsProvider extends ContentProvider {
 
                 TextLinks links = mTextClassifier.generateLinks(request);
 
+                final boolean appCompatApiEnabled =
+                        android.view.flags.Flags.redactOtpAppCompatApi();
+                final boolean webOtpApiEnabled =
+                        android.view.flags.Flags.redactWebOtpSmsApi();
                 int otpType = Sms.OTP_TYPE_NONE;
                 for (TextLinks.TextLink link : links.getLinks()) {
                     for (int i = 0; i < link.getEntityCount(); i++) {
-                        if (link.getEntity(i).equals(TextClassifier.TYPE_SMS_RETRIEVER_OTP)
-                            || (android.view.flags.Flags.redactWebOtpSmsApi()
-                                  && link.getEntity(i).equals(TextClassifier.TYPE_SMS_WEB_OTP))
-                            || (android.view.flags.Flags.redactOtpAppCompatApi()
-                                  && link.getEntity(i).equals(TextClassifier.TYPE_OTP))) {
-                            otpType = Sms.OTP_TYPE_CONTAINS_OTP;
-                            break;
+                        final String entity = link.getEntity(i);
+
+                        boolean isOtp = false;
+                        // The sub-type distinguishes different type of OTP message.
+                        // E.g. SMS Retriever OTP, Web OTP, or a generic OTP.
+                        // Note that this represents bitfields of `otpType`.
+                        // Please refer to Sms.OTP_SUBTYPE_* definitions for more details.
+                        int subType = 0;
+                        if (entity.equals(TextClassifier.TYPE_SMS_RETRIEVER_OTP)) {
+                            isOtp = true;
+                            subType = Sms.OTP_SUBTYPE_SMS_RETRIEVER_OTP;
+                        } else if (webOtpApiEnabled
+                                      && entity.equals(TextClassifier.TYPE_SMS_WEB_OTP)) {
+                            isOtp = true;
+                            subType = Sms.OTP_SUBTYPE_WEB_OTP;
+                        } else if (appCompatApiEnabled
+                                      && entity.equals(TextClassifier.TYPE_OTP)) {
+                            isOtp = true;
+                            subType = Sms.OTP_SUBTYPE_NONE;
                         }
-                    }
-                    if (otpType != Sms.OTP_TYPE_NONE) {
-                        break;
+
+                        if (isOtp) {
+                            otpType |= Sms.OTP_TYPE_CONTAINS_OTP;
+                            if (appCompatApiEnabled) {
+                                // If Redact OTP App Compat API is enabled, add the subtype.
+                                otpType |= subType;
+                            }
+                        }
                     }
                 }
                 ContentValues values = new ContentValues();
                 values.put(Sms.CONTAINS_OTP, otpType);
                 updateWithRetry(uri, values, "scheduleOtpCheck", 1);
 
-                if (otpType == Sms.OTP_TYPE_CONTAINS_OTP) {
+                if ((otpType & Telephony.Sms.OTP_TYPE_MASK) == Sms.OTP_TYPE_CONTAINS_OTP) {
                     // Schedule an update for when the OTP hiding time expires, to remove the "has
                     // otp" value. This is best-effort, not guaranteed.
                     mMainThreadHandler.postDelayed(() -> {

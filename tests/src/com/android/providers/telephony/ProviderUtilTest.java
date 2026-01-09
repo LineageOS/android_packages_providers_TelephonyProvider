@@ -26,16 +26,21 @@ import android.app.AppOpsManager;
 import android.content.Context;
 import android.os.UserHandle;
 import android.os.Process;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.telephony.emergency.EmergencyNumber;
+import com.android.internal.telephony.flags.Flags;
 
 import androidx.test.core.app.ApplicationProvider;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.Rule;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -45,6 +50,8 @@ import java.util.Map;
 
 public class ProviderUtilTest {
     private static final String TAG = "ProviderUtilTest";
+
+    @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private Context mContext;
     @Mock
@@ -66,7 +73,7 @@ public class ProviderUtilTest {
 
         when(mContext.getSystemService(SubscriptionManager.class)).thenReturn(mSubscriptionManager);
         when(mContext.getSystemService(TelephonyManager.class)).thenReturn(mTelephonyManager);
-        when(mContext.getSystemService(AppOpsManager.class)).thenReturn(mAppOpsManager);
+        when(mContext.getSystemService(Context.APP_OPS_SERVICE)).thenReturn(mAppOpsManager);
     }
 
     @After
@@ -80,7 +87,7 @@ public class ProviderUtilTest {
         doReturn(subscriptionInfoList).when(mSubscriptionManager)
                 .getSubscriptionInfoListAssociatedWithUser(UserHandle.SYSTEM);
 
-        assertThat(ProviderUtil.getSelectionBySubIds(mContext, UserHandle.SYSTEM))
+        assertThat(ProviderUtil.getSelectionBySubIds(mContext, UserHandle.SYSTEM, null))
                 .isEqualTo("sub_id IN ('-1')");
     }
 
@@ -96,7 +103,7 @@ public class ProviderUtilTest {
         doReturn(subscriptionInfoList).when(mSubscriptionManager)
                 .getSubscriptionInfoListAssociatedWithUser(UserHandle.SYSTEM);
 
-        assertThat(ProviderUtil.getSelectionBySubIds(mContext, UserHandle.SYSTEM))
+        assertThat(ProviderUtil.getSelectionBySubIds(mContext, UserHandle.SYSTEM, null))
                 .isEqualTo("sub_id IN ('-1','-1')");
     }
 
@@ -118,8 +125,31 @@ public class ProviderUtilTest {
         doReturn(subscriptionInfoList).when(mSubscriptionManager)
                 .getSubscriptionInfoListAssociatedWithUser(UserHandle.SYSTEM);
 
-        assertThat(ProviderUtil.getSelectionBySubIds(mContext, UserHandle.SYSTEM))
+        assertThat(ProviderUtil.getSelectionBySubIds(mContext, UserHandle.SYSTEM, null))
                 .isEqualTo("sub_id IN ('1','2','-1')");
+    }
+
+    @Test
+    public void getSelectionBySubIds_withTableName_withActiveSubscriptions() {
+        String tableName = "pdu";
+        SubscriptionInfo subscriptionInfo1 = new SubscriptionInfo.Builder()
+                .setId(1)
+                .setSimSlotIndex(0)
+                .build();
+        List<SubscriptionInfo> subscriptionInfoList = new ArrayList<>();
+
+        SubscriptionInfo subscriptionInfo2 = new SubscriptionInfo.Builder()
+                .setId(2)
+                .setSimSlotIndex(1)
+                .build();
+
+        subscriptionInfoList.add(subscriptionInfo1);
+        subscriptionInfoList.add(subscriptionInfo2);
+        doReturn(subscriptionInfoList).when(mSubscriptionManager)
+                .getSubscriptionInfoListAssociatedWithUser(UserHandle.SYSTEM);
+
+        assertThat(ProviderUtil.getSelectionBySubIds(mContext, UserHandle.SYSTEM, tableName))
+                .isEqualTo(tableName + "." + "sub_id IN ('1','2','-1')");
     }
 
     @Test
@@ -155,12 +185,14 @@ public class ProviderUtilTest {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
     public void canReadRestrictedMessages_systemUid_returnsTrue() {
         assertThat(ProviderUtil.canReadRestrictedMessages(mContext, mContext.getPackageName(),
                 Process.SYSTEM_UID)).isTrue();
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
     public void canReadRestrictedMessages_packageNoAppOpGranted_returnsFalse() {
         when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_READ_RESTRICTED_MESSAGES,
                 EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
@@ -171,6 +203,7 @@ public class ProviderUtilTest {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
     public void canReadRestrictedMessages_packageWithAppOpGranted_returnsTrue() {
         when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_READ_RESTRICTED_MESSAGES,
                 EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
@@ -181,12 +214,25 @@ public class ProviderUtilTest {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    public void canReadRestrictedMessages_packageWithAppOpGranted_flagDisabled_returnsTrue() {
+        when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_READ_RESTRICTED_MESSAGES,
+                EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
+                    AppOpsManager.MODE_ALLOWED);
+
+        assertThat(ProviderUtil.canReadRestrictedMessages(mContext, EXAMPLE_PACKAGE_NAME,
+                EXAMPLE_PACKAGE_UID)).isTrue();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
     public void canWriteRestrictedMessages_systemUid_returnsTrue() {
         assertThat(ProviderUtil.canWriteRestrictedMessages(mContext, mContext.getPackageName(),
                 Process.SYSTEM_UID)).isTrue();
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
     public void canWriteRestrictedMessages_packageNoAppOpGranted_returnsFalse() {
         when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES,
                 EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
@@ -197,7 +243,19 @@ public class ProviderUtilTest {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
     public void canWriteRestrictedMessages_packageWithAppOpGranted_returnsTrue() {
+        when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES,
+                EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
+                    AppOpsManager.MODE_ALLOWED);
+
+        assertThat(ProviderUtil.canWriteRestrictedMessages(mContext, EXAMPLE_PACKAGE_NAME,
+                EXAMPLE_PACKAGE_UID)).isTrue();
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    public void canWriteRestrictedMessages_flagDisabled_packageWithAppOpGranted_returnsTrue() {
         when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES,
                 EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
                     AppOpsManager.MODE_ALLOWED);

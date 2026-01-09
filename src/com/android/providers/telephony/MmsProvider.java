@@ -47,6 +47,8 @@ import android.provider.Telephony.Mms.Part;
 import android.provider.Telephony.Mms.Rate;
 import android.provider.Telephony.MmsSms;
 import android.provider.Telephony.Threads;
+import android.provider.Telephony.ReadRestriction;
+import android.provider.Telephony.ReadRestriction.ReadRestrictionValues;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.telephony.SmsManager;
@@ -56,6 +58,7 @@ import android.util.EventLog;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.telephony.flags.Flags;
 import com.android.internal.telephony.util.TelephonyUtils;
 
 import com.google.android.mms.pdu.PduHeaders;
@@ -79,6 +82,10 @@ public class MmsProvider extends ContentProvider {
     static final String TABLE_DRM  = "drm";
     static final String TABLE_WORDS = "words";
     static final String VIEW_PDU_RESTRICTED = "pdu_restricted";
+    private static final String FIELD_UPDATE_NOT_SUPPORTED_ERROR_MESSAGE =
+        "MmsProvider does not support updates for this field.";
+    private static final String FIELD_INSERT_NOT_SUPPORTED_ERROR_MESSAGE =
+        "MmsProvider does not support inserts for this field.";
 
     // The name of parts directory. The full dir is "app_parts".
     static final String PARTS_DIR_NAME = "parts";
@@ -115,6 +122,10 @@ public class MmsProvider extends ContentProvider {
         public boolean isAccessRestricted(Context context, String packageName, int uid) {
             return ProviderUtil.isAccessRestricted(context, packageName, uid);
         }
+
+        public boolean canReadRestrictedMessages(Context context, String packageName, int uid) {
+            return ProviderUtil.canReadRestrictedMessages(context, packageName, uid);
+        }
     }
 
     /**
@@ -146,6 +157,14 @@ public class MmsProvider extends ContentProvider {
             SqlQueryChecker.checkQueryParametersForSubqueries(projection, selection, sortOrder);
         }
 
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            SqlQueryChecker.checkQueryForForbiddenColumns(projection, selection, sortOrder, TAG);
+        }
+
+        final boolean canReadRestrictedMessages = providerUtilWrapper.canReadRestrictedMessages(
+                getContext(), getCallingPackage(), callerUid);
+        Log.v(TAG, "canReadRestrictedMessages=" + canReadRestrictedMessages);
+
         try {
             SqlQueryChecker.checkSelection(selection);
         } catch (IllegalArgumentException e) {
@@ -164,115 +183,72 @@ public class MmsProvider extends ContentProvider {
 
         switch (match) {
             case MMS_ALL:
-                constructQueryForBox(qb, Mms.MESSAGE_BOX_ALL, pduTable);
+                constructQueryForBox(qb, Mms.MESSAGE_BOX_ALL, pduTable, canReadRestrictedMessages);
                 break;
             case MMS_INBOX:
-                constructQueryForBox(qb, Mms.MESSAGE_BOX_INBOX, pduTable);
+                constructQueryForBox(qb, Mms.MESSAGE_BOX_INBOX, pduTable,
+                        canReadRestrictedMessages);
                 break;
             case MMS_SENT:
-                constructQueryForBox(qb, Mms.MESSAGE_BOX_SENT, pduTable);
+                constructQueryForBox(qb, Mms.MESSAGE_BOX_SENT, pduTable, canReadRestrictedMessages);
                 break;
             case MMS_DRAFTS:
-                constructQueryForBox(qb, Mms.MESSAGE_BOX_DRAFTS, pduTable);
+                constructQueryForBox(qb, Mms.MESSAGE_BOX_DRAFTS, pduTable,
+                        canReadRestrictedMessages);
                 break;
             case MMS_OUTBOX:
-                constructQueryForBox(qb, Mms.MESSAGE_BOX_OUTBOX, pduTable);
+                constructQueryForBox(qb, Mms.MESSAGE_BOX_OUTBOX, pduTable,
+                        canReadRestrictedMessages);
                 break;
             case MMS_ALL_ID:
-                qb.setTables(pduTable);
-                qb.appendWhere(Mms._ID + "=" + uri.getPathSegments().get(0));
+                constructQueryForAllMms(qb, pduTable, canReadRestrictedMessages);
+                appendWhere(qb, Mms._ID + "=" + uri.getPathSegments().get(0));
                 break;
             case MMS_INBOX_ID:
             case MMS_SENT_ID:
             case MMS_DRAFTS_ID:
             case MMS_OUTBOX_ID:
-                qb.setTables(pduTable);
-                qb.appendWhere(Mms._ID + "=" + uri.getPathSegments().get(1));
-                qb.appendWhere(" AND " + Mms.MESSAGE_BOX + "="
-                        + getMessageBoxByMatch(match));
+                constructQueryForAllMms(qb, pduTable, canReadRestrictedMessages);
+                if (Flags.secureAccessToRestrictedRcsMessages()) {
+                    qb.appendWhereStandalone(Mms._ID + "=" + uri.getPathSegments().get(1));
+                    qb.appendWhereStandalone(Mms.MESSAGE_BOX + "=" + getMessageBoxByMatch(match));
+                } else {
+                    qb.appendWhere(Mms._ID + "=" + uri.getPathSegments().get(1));
+                    qb.appendWhere(" AND " + Mms.MESSAGE_BOX + "="
+                            + getMessageBoxByMatch(match));
+                }
                 break;
             case MMS_ALL_PART:
-                qb.setTables(TABLE_PART);
+                constructQueryForPartTable(qb, pduTable, canReadRestrictedMessages);
                 break;
             case MMS_MSG_PART:
-                qb.setTables(TABLE_PART);
-                qb.appendWhere(Part.MSG_ID + "=" + uri.getPathSegments().get(0));
+                constructQueryForPartTable(qb, pduTable, canReadRestrictedMessages);
+                appendWhere(qb, Part.MSG_ID + "=" + uri.getPathSegments().get(0));
                 break;
             case MMS_PART_ID:
-                qb.setTables(TABLE_PART);
-                qb.appendWhere(Part._ID + "=" + uri.getPathSegments().get(1));
+                constructQueryForPartTable(qb, pduTable, canReadRestrictedMessages);
+                appendWhere(qb, TABLE_PART + "." + Part._ID + "=" + uri.getPathSegments().get(1));
                 break;
             case MMS_MSG_ADDR:
-                qb.setTables(TABLE_ADDR);
-                qb.appendWhere(Addr.MSG_ID + "=" + uri.getPathSegments().get(0));
+                constructQueryForAddressTable(qb, pduTable, canReadRestrictedMessages);
+                appendWhere(qb, TABLE_ADDR + "." + Addr.MSG_ID + "="
+                        + uri.getPathSegments().get(0));
                 break;
             case MMS_REPORT_STATUS:
-                /*
-                   SELECT DISTINCT address,
-                                   T.delivery_status AS delivery_status,
-                                   T.read_status AS read_status
-                   FROM addr
-                   INNER JOIN (SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3,
-                                      ifnull(P2.st, 0) AS delivery_status,
-                                      ifnull(P3.read_status, 0) AS read_status
-                               FROM pdu P1
-                               INNER JOIN pdu P2
-                               ON P1.m_id = P2.m_id AND P2.m_type = 134
-                               LEFT JOIN pdu P3
-                               ON P1.m_id = P3.m_id AND P3.m_type = 136
-                               UNION
-                               SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3,
-                                      ifnull(P2.st, 0) AS delivery_status,
-                                      ifnull(P3.read_status, 0) AS read_status
-                               FROM pdu P1
-                               INNER JOIN pdu P3
-                               ON P1.m_id = P3.m_id AND P3.m_type = 136
-                               LEFT JOIN pdu P2
-                               ON P1.m_id = P2.m_id AND P2.m_type = 134) T
-                   ON (msg_id = id2 AND type = 151)
-                   OR (msg_id = id3 AND type = 137)
-                   WHERE T.id1 = ?;
-                 */
-                qb.setTables(TABLE_ADDR + " INNER JOIN "
-                        + "(SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3, "
-                        + "ifnull(P2.st, 0) AS delivery_status, "
-                        + "ifnull(P3.read_status, 0) AS read_status "
-                        + "FROM " + pduTable + " P1 INNER JOIN " + pduTable + " P2 "
-                        + "ON P1.m_id=P2.m_id AND P2.m_type=134 "
-                        + "LEFT JOIN " + pduTable + " P3 "
-                        + "ON P1.m_id=P3.m_id AND P3.m_type=136 "
-                        + "UNION "
-                        + "SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3, "
-                        + "ifnull(P2.st, 0) AS delivery_status, "
-                        + "ifnull(P3.read_status, 0) AS read_status "
-                        + "FROM " + pduTable + " P1 INNER JOIN " + pduTable + " P3 "
-                        + "ON P1.m_id=P3.m_id AND P3.m_type=136 "
-                        + "LEFT JOIN " + pduTable + " P2 "
-                        + "ON P1.m_id=P2.m_id AND P2.m_type=134) T "
-                        + "ON (msg_id=id2 AND type=151) OR (msg_id=id3 AND type=137)");
-                qb.appendWhere("T.id1 = " + uri.getLastPathSegment());
-                qb.setDistinct(true);
+                constructQueryForStatusReport(qb, uri, pduTable, canReadRestrictedMessages);
                 break;
             case MMS_REPORT_REQUEST:
-                /*
-                   SELECT address, d_rpt, rr
-                   FROM addr join pdu on pdu._id = addr.msg_id
-                   WHERE pdu._id = messageId AND addr.type = 151
-                 */
-                qb.setTables(TABLE_ADDR + " join " +
-                        pduTable + " on " + pduTable + "._id = addr.msg_id");
-                qb.appendWhere(pduTable + "._id = " + uri.getLastPathSegment());
-                qb.appendWhere(" AND " + TABLE_ADDR + ".type = " + PduHeaders.TO);
+                constructQueryForReportRequest(qb, uri, pduTable, canReadRestrictedMessages);
                 break;
             case MMS_SENDING_RATE:
                 qb.setTables(TABLE_RATE);
                 break;
             case MMS_DRM_STORAGE_ID:
                 qb.setTables(TABLE_DRM);
-                qb.appendWhere(BaseColumns._ID + "=" + uri.getLastPathSegment());
+                appendWhere(qb, BaseColumns._ID + "=" + uri.getLastPathSegment());
                 break;
             case MMS_THREADS:
-                qb.setTables(pduTable + " group by thread_id");
+                constructQueryForMmsThreads(qb, pduTable, canReadRestrictedMessages);
                 break;
             default:
                 Log.e(TAG, "query: invalid request: " + uri);
@@ -284,7 +260,7 @@ public class MmsProvider extends ContentProvider {
         try {
             // Filter MMS based on subId.
             selectionBySubIds = ProviderUtil.getSelectionBySubIds(getContext(),
-                    callerUserHandle);
+                    callerUserHandle, getFirstTableName(qb));
         } finally {
             Binder.restoreCallingIdentity(token);
         }
@@ -327,11 +303,190 @@ public class MmsProvider extends ContentProvider {
         return ret;
     }
 
-    private void constructQueryForBox(SQLiteQueryBuilder qb, int msgBox, String pduTable) {
+
+    private static void appendWhere(SQLiteQueryBuilder qb, String where) {
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            qb.appendWhereStandalone(where);
+        } else {
+            qb.appendWhere(where);
+        }
+    }
+
+    /**
+     * Returns the first table name in the query. This is used to disambiguate the sub_id column
+     * name when two tables are joined.
+     */
+    private static String getFirstTableName(SQLiteQueryBuilder qb) {
+        return qb.getTables().split("[, ]+")[0];
+    }
+
+    /**
+     * Constructs a query to retrieve status reports from the addr and pdu tables.
+     *
+     * @param qb The SQLiteQueryBuilder to construct the query with.
+     * @param canReadRestrictedMessages Whether the caller can read restricted messages. If not,
+     * the restricted messages in pdu table will be filtered out.
+     */
+    private void constructQueryForStatusReport(SQLiteQueryBuilder qb, Uri uri, String pduTable,
+        boolean canReadRestrictedMessages) {
+            /*
+                SELECT DISTINCT address,
+                                T.delivery_status AS delivery_status,
+                                T.read_status AS read_status
+                FROM addr
+                INNER JOIN (SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3,
+                                    ifnull(P1.read_restriction, 0) AS read_restriction,
+                                    ifnull(P2.st, 0) AS delivery_status,
+                                    ifnull(P3.read_status, 0) AS read_status,
+                            FROM pdu P1
+                            INNER JOIN pdu P2
+                            ON P1.m_id = P2.m_id AND P2.m_type = 134
+                            LEFT JOIN pdu P3
+                            ON P1.m_id = P3.m_id AND P3.m_type = 136
+                            UNION
+                            SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3,
+                                    ifnull(P1.read_restriction, 0) AS read_restriction,
+                                    ifnull(P2.st, 0) AS delivery_status,
+                                    ifnull(P3.read_status, 0) AS read_status
+                            FROM pdu P1
+                            INNER JOIN pdu P3
+                            ON P1.m_id = P3.m_id AND P3.m_type = 136
+                            LEFT JOIN pdu P2
+                            ON P1.m_id = P2.m_id AND P2.m_type = 134) T
+                ON (msg_id = id2 AND type = 151)
+                OR (msg_id = id3 AND type = 137)
+                WHERE T.id1 = ?;
+                */
+            final String readRestrictionColumnQuery =
+                    Flags.secureAccessToRestrictedRcsMessages()
+                        ? "ifnull(P1.read_restriction, 0) AS read_restriction, " : "";
+            qb.setTables(TABLE_ADDR + " INNER JOIN "
+                    + "(SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3, "
+                    + readRestrictionColumnQuery
+                    + "ifnull(P2.st, 0) AS delivery_status, "
+                    + "ifnull(P3.read_status, 0) AS read_status "
+                    + "FROM " + pduTable + " P1 INNER JOIN " + pduTable + " P2 "
+                    + "ON P1.m_id=P2.m_id AND P2.m_type=134 "
+                    + "LEFT JOIN " + pduTable + " P3 "
+                    + "ON P1.m_id=P3.m_id AND P3.m_type=136 "
+                    + "UNION "
+                    + "SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3, "
+                    + readRestrictionColumnQuery
+                    + "ifnull(P2.st, 0) AS delivery_status, "
+                    + "ifnull(P3.read_status, 0) AS read_status "
+                    + "FROM " + pduTable + " P1 INNER JOIN " + pduTable + " P3 "
+                    + "ON P1.m_id=P3.m_id AND P3.m_type=136 "
+                    + "LEFT JOIN " + pduTable + " P2 "
+                    + "ON P1.m_id=P2.m_id AND P2.m_type=134) T "
+                    + "ON (msg_id=id2 AND type=151) OR (msg_id=id3 AND type=137)");
+            appendWhere(qb, "T.id1 = " + uri.getLastPathSegment());
+            ReadRestriction.appendReadRestrictionToQuery(qb, "T", canReadRestrictedMessages);
+            qb.setDistinct(true);
+    }
+
+    /**
+     * Constructs a query to retrieve report requests from the addr and pdu tables.
+     *
+     * @param qb The SQLiteQueryBuilder to construct the query with.
+     * @param uri The URI of the query.
+     * @param canReadRestrictedMessages Whether the caller can read restricted messages. If not,
+     * the restricted messages in pdu table will be filtered out.
+     */
+    private void constructQueryForReportRequest(SQLiteQueryBuilder qb, Uri uri, String pduTable,
+        boolean canReadRestrictedMessages) {
+        // TODO (b/459576374): Update the query comment to include the optional read_restriction
+        // column.
+        /*
+            SELECT address, d_rpt, rr, pdu.read_restriction
+            FROM addr join pdu on pdu._id = addr.msg_id
+            WHERE pdu._id = messageId AND addr.type = 151
+        */
+        qb.setTables(TABLE_ADDR);
+        if(Flags.secureAccessToRestrictedRcsMessages()) {
+            qb.appendWhereStandalone(pduTable + "._id = " + uri.getLastPathSegment());
+            qb.appendWhereStandalone(TABLE_ADDR + ".type = " + PduHeaders.TO);
+        } else {
+            qb.appendWhere(pduTable + "._id = " + uri.getLastPathSegment());
+            qb.appendWhere(" AND " + TABLE_ADDR + ".type = " + PduHeaders.TO);
+        }
+        String joinAssignmentClause = pduTable + "._id = " + TABLE_ADDR + ".msg_id";
+        ReadRestriction.appendReadRestrictionToQuery(qb, joinAssignmentClause, pduTable,
+            canReadRestrictedMessages);
+    }
+
+    /**
+     * Constructs a query for the part table. Join with the pdu table to get the read restriction
+     * column value.
+     *
+     * @param qb The SQLiteQueryBuilder to construct the query with.
+     * @param canReadRestrictedMessages Whether the caller can read restricted messages.
+     */
+    private void constructQueryForPartTable(SQLiteQueryBuilder qb, String pduTable,
+        boolean canReadRestrictedMessages) {
+        qb.setTables(TABLE_PART);
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            final String joinAssignmentClause = pduTable + "._id=" + TABLE_PART + ".mid";
+            ReadRestriction.appendReadRestrictionToQuery(qb, joinAssignmentClause, pduTable,
+                canReadRestrictedMessages);
+        }
+    }
+
+    /**
+     * Constructs a query to retrieve the MMS threads from the pdu table.
+     *
+     * @param qb The SQLiteQueryBuilder to construct the query with.
+     * @param canReadRestrictedMessages Whether the caller can read restricted messages. If not,
+     * the restricted messages in pdu table will be filtered out.
+     */
+    private void constructQueryForMmsThreads(SQLiteQueryBuilder qb, String pduTable,
+        boolean canReadRestrictedMessages) {
+        qb.setTables(pduTable + " group by thread_id");
+        ReadRestriction.appendReadRestrictionToQuery(qb, pduTable, canReadRestrictedMessages);
+    }
+
+    /**
+     * Constructs a query for the address table. Join with the pdu table to get the read restriction
+     * column value.
+     *
+     * @param qb The SQLiteQueryBuilder to construct the query with.
+     * @param canReadRestrictedMessages Whether the caller can read restricted messages.
+     */
+    private void constructQueryForAddressTable(SQLiteQueryBuilder qb, String pduTable,
+        boolean canReadRestrictedMessages) {
+        qb.setTables(TABLE_ADDR);
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            final String joinAssignmentClause = pduTable + "._id=" + TABLE_ADDR + ".msg_id";
+            ReadRestriction.appendReadRestrictionToQuery(qb, joinAssignmentClause, pduTable,
+                canReadRestrictedMessages);
+        }
+    }
+
+    /**
+     * Constructs a query for all rows in the pdu table.
+     *
+     * @param qb The SQLiteQueryBuilder to construct the query with.
+     * @param canReadRestrictedMessages Whether the caller can read restricted messages.
+     */
+    private void constructQueryForAllMms(SQLiteQueryBuilder qb, String pduTable,
+        boolean canReadRestrictedMessages) {
         qb.setTables(pduTable);
+        ReadRestriction.appendReadRestrictionToQuery(qb, pduTable, canReadRestrictedMessages);
+    }
+
+    /**
+     * Constructs a query to retrieve box messages for the pdu table.
+     *
+     * @param qb The SQLiteQueryBuilder to construct the query with.
+     * @param msgBox The message box to query.
+     * @param canReadRestrictedMessages Whether the caller can read restricted messages. If not,
+     * the restricted messages in pdu table will be filtered out.
+     */
+    private void constructQueryForBox(SQLiteQueryBuilder qb, int msgBox, String pduTable,
+        boolean canReadRestrictedMessages) {
+        constructQueryForAllMms(qb, pduTable, canReadRestrictedMessages);
 
         if (msgBox != Mms.MESSAGE_BOX_ALL) {
-            qb.appendWhere(Mms.MESSAGE_BOX + "=" + msgBox);
+            appendWhere(qb, Mms.MESSAGE_BOX + "=" + msgBox);
         }
     }
 
@@ -485,6 +640,15 @@ public class MmsProvider extends ContentProvider {
             // TODO: Should initialValues be validated, e.g. if it
             // missed some significant keys?
             finalValues = new ContentValues(values);
+
+            if (Flags.secureAccessToRestrictedRcsMessages()) {
+                final boolean canWriteRestrictedMessages = ProviderUtil.canWriteRestrictedMessages(
+                        getContext(), callerPkg, callerUid);
+                final int readRestrictionValue =
+                    ReadRestriction.computeReadRestrictionValueOnInsert(values,
+                        canWriteRestrictedMessages);
+                finalValues.put(ReadRestriction.READ_RESTRICTION_COLUMN_NAME, readRestrictionValue);
+            }
 
             long timeInMillis = System.currentTimeMillis();
 
@@ -753,6 +917,12 @@ public class MmsProvider extends ContentProvider {
             Log.v(TAG, "Delete uri=" + uri + ", match=" + match);
         }
 
+        // The delete operation is already restricted to WRITE_SMS permission, so we don't need
+        // further restriction for deleting restricted messages.
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            SqlQueryChecker.checkQueryForForbiddenColumns(selectionArgs, selection, null, TAG);
+        }
+
         String table, extraSelection = null;
         boolean notify = false;
 
@@ -818,7 +988,7 @@ public class MmsProvider extends ContentProvider {
         try {
             // Filter SMS based on subId.
             selectionBySubIds = ProviderUtil.getSelectionBySubIds(context,
-                    callerUserHandle);
+                    callerUserHandle, table);
         } finally {
             Binder.restoreCallingIdentity(token);
         }
@@ -961,6 +1131,9 @@ public class MmsProvider extends ContentProvider {
         if (values != null && values.containsKey(Part._DATA)) {
             return 0;
         }
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            SqlQueryChecker.checkQueryForForbiddenColumns(selectionArgs, selection, null, TAG);
+        }
         final int callerUid = Binder.getCallingUid();
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         final String callerPkg = getCallingPackage();
@@ -1028,8 +1201,8 @@ public class MmsProvider extends ContentProvider {
         String selectionBySubIds;
         try {
             // Filter MMS based on subId.
-            selectionBySubIds = ProviderUtil.getSelectionBySubIds(getContext(),
-                    callerUserHandle);
+            selectionBySubIds = ProviderUtil.getSelectionBySubIds(getContext(), callerUserHandle,
+                    table);
         } finally {
             Binder.restoreCallingIdentity(token);
         }
@@ -1049,6 +1222,17 @@ public class MmsProvider extends ContentProvider {
                 values.remove(Mms.CREATOR);
             }
             finalValues = new ContentValues(values);
+            if (Flags.secureAccessToRestrictedRcsMessages()) {
+                final boolean canWriteRestrictedMessages = ProviderUtil.canWriteRestrictedMessages(
+                        getContext(), callerPkg, callerUid);
+                final Integer readRestrictionValue
+                    = ReadRestriction.computeReadRestrictionValueOnUpdate(values,
+                            canWriteRestrictedMessages);
+                if (readRestrictionValue != null) {
+                    finalValues.put(ReadRestriction.READ_RESTRICTION_COLUMN_NAME,
+                            readRestrictionValue);
+                }
+            }
 
             if (msgId != null) {
                 extraSelection = Mms._ID + "=" + msgId;
@@ -1322,7 +1506,7 @@ public class MmsProvider extends ContentProvider {
         try {
             // Filter MMS based on subId.
             selectionBySubIds = ProviderUtil.getSelectionBySubIds(getContext(),
-                    userToBeRemoved);
+                    userToBeRemoved, null);
         } finally {
             Binder.restoreCallingIdentity(token);
         }

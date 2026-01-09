@@ -20,8 +20,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.spy;
+
+import androidx.test.core.app.ApplicationProvider;
 
 import android.app.AppOpsManager;
 import android.content.ContentValues;
@@ -41,6 +45,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import org.mockito.Mock;
 
 import junit.framework.TestCase;
 
@@ -52,6 +57,7 @@ public class MmsProviderTest extends TestCase {
     private File testDir;
     private File partsDir;
 
+    private AppOpsManager mAppOpsManager;
     private MockContentResolver mContentResolver;
     private MmsProviderTestable mMmsProviderTestable;
 
@@ -67,13 +73,19 @@ public class MmsProviderTest extends TestCase {
 
         // setup mocks
         context = mock(Context.class);
+        mAppOpsManager = mock(AppOpsManager.class);
+        when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
+                anyInt(), anyString(), anyString(), anyString())).thenReturn(
+                    AppOpsManager.MODE_IGNORED);
+        when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES),
+                anyInt(), anyString(), anyString(), anyString())).thenReturn(
+                    AppOpsManager.MODE_IGNORED);
         PackageManager packageManager = mock(PackageManager.class);
         Resources resources = mock(Resources.class);
         when(context.getSystemService(eq(Context.APP_OPS_SERVICE)))
                 .thenReturn(mock(AppOpsManager.class));
         when(context.getSystemService(eq(Context.TELEPHONY_SERVICE)))
                 .thenReturn(mock(TelephonyManager.class));
-
         when(context.checkCallingOrSelfPermission(anyString()))
                 .thenReturn(PackageManager.PERMISSION_GRANTED);
         when(context.getUserId()).thenReturn(0);

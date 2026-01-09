@@ -13,12 +13,14 @@ android_test {
         "truth",
         "androidx.test.core",
         "androidx.test.ext.junit",
+        "telephony_flags_core_java_lib",
     ],
     libs: [
         "android.test.runner.stubs.system",
         "telephony-common",
         "android.test.base.stubs.system",
         "android.test.mock.stubs.system",
+        "platform-test-annotations",
     ],
     srcs: [
         "src/**/*.java",

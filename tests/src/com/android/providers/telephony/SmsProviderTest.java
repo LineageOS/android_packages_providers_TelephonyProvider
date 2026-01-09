@@ -324,7 +324,8 @@ public class SmsProviderTest extends TestCase {
                     "CREATE VIEW IF NOT EXISTS sms_restricted AS SELECT _id, thread_id, address, "
                             + "person, date, date_sent, protocol, read, status, type, "
                             + "reply_path_present, subject, body, service_center, locked, sub_id,"
-                            + " error_code, creator, seen FROM sms WHERE (type=1 OR type=2)");
+                            + " error_code, creator, seen, read_restriction"
+                            + " FROM sms WHERE (type=1 OR type=2)");
 
             for (String selection : normalSelections) {
                 Cursor cursor = null;

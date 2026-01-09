@@ -17,13 +17,25 @@
 package com.android.providers.telephony;
 
 import android.util.Log;
+import android.provider.Telephony.ReadRestriction;
+import java.util.Set;
+import java.util.function.Consumer;
 
 public class SqlQueryChecker {
     private static final String SELECT_TOKEN = "select";
+    private static final Set<String> FORBIDDEN_TOKENS =
+        Set.of(ReadRestriction.READ_RESTRICTION_COLUMN_NAME);
 
-    static void checkToken(String token) {
+    static void checkTokenForSelect(String token) {
         if (SELECT_TOKEN.equalsIgnoreCase(token)) {
             throw new IllegalArgumentException("SELECT token not allowed in query");
+        }
+    }
+
+    private static void checkTokenForForbiddenColumns(String token) {
+        if (FORBIDDEN_TOKENS.contains(token)) {
+            throw new IllegalArgumentException(
+                String.format("%s token not allowed in query", token));
         }
     }
 
@@ -34,20 +46,18 @@ public class SqlQueryChecker {
      */
     static void checkQueryParametersForSubqueries(String[] projection,
             String selection, String sortOrder) {
-        Log.v("MmsProvider", "inside checkQueryParametersForSubqueries");
-        if (projection != null) {
-            for (String proj : projection) {
-                Log.v("MmsProvider", "checkQueryParametersForSubqueries checking proj: " + proj);
-                SQLiteTokenizer.tokenize(proj, SQLiteTokenizer.OPTION_NONE,
-                        SqlQueryChecker::checkToken);
-            }
-        }
-        Log.v("MmsProvider", "checkQueryParametersForSubqueries checking sel: " + selection);
-        SQLiteTokenizer.tokenize(selection, SQLiteTokenizer.OPTION_NONE,
-                SqlQueryChecker::checkToken);
-        Log.v("MmsProvider", "checkQueryParametersForSubqueries checking sort: " + sortOrder);
-        SQLiteTokenizer.tokenize(sortOrder, SQLiteTokenizer.OPTION_NONE,
-                SqlQueryChecker::checkToken);
+        checkQueryForToken(projection, selection, sortOrder, "MmsProvider",
+                "checkQueryParametersForSubqueries", SqlQueryChecker::checkTokenForSelect);
+    }
+
+    /**
+     * Check the query parameters to see if they contain reference to columns that shouldn't be
+     * queried or modified directly by apps. Throws an {@link IllegalArgumentException} if they do.
+     */
+    static void checkQueryForForbiddenColumns(String[] projection,
+            String selection, String sortOrder, String logTag) {
+        checkQueryForToken(projection, selection, sortOrder, logTag,
+                "checkQueryForForbiddenColumns", SqlQueryChecker::checkTokenForForbiddenColumns);
     }
 
     /**
@@ -59,5 +69,21 @@ public class SqlQueryChecker {
     static void checkSelection(String selection) {
         Log.v("MmsProvider", "inside checkSelection checking sel: " + selection);
         SQLiteTokenizer.tokenize(selection, SQLiteTokenizer.OPTION_CHECK_BRACKETS, null);
+    }
+
+
+    private static void checkQueryForToken(String[] projection, String selection,
+            String sortOrder, String logTag, String methodName, Consumer<String> checker) {
+        Log.v(logTag, "inside " + methodName);
+        if (projection != null) {
+            for (String proj : projection) {
+                Log.v(logTag, methodName + " checking proj: " + proj);
+                SQLiteTokenizer.tokenize(proj, SQLiteTokenizer.OPTION_NONE, checker);
+            }
+        }
+        Log.v(logTag, methodName + " checking sel: " + selection);
+        SQLiteTokenizer.tokenize(selection, SQLiteTokenizer.OPTION_NONE, checker);
+        Log.v(logTag, methodName + " checking sort: " + sortOrder);
+        SQLiteTokenizer.tokenize(sortOrder, SQLiteTokenizer.OPTION_NONE, checker);
     }
 }

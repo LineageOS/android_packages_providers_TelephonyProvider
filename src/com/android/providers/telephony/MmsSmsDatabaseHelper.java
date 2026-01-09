@@ -37,21 +37,26 @@ import android.os.storage.StorageManager;
 import android.preference.PreferenceManager;
 import android.provider.BaseColumns;
 import android.provider.Telephony;
+import android.provider.Telephony.CanonicalAddressesColumns;
 import android.provider.Telephony.Mms;
 import android.provider.Telephony.Mms.Addr;
 import android.provider.Telephony.Mms.Part;
 import android.provider.Telephony.Mms.Rate;
 import android.provider.Telephony.MmsSms;
 import android.provider.Telephony.MmsSms.PendingMessages;
+import android.provider.Telephony.ReadRestriction;
+import android.provider.Telephony.ReadRestriction.ReadRestrictionValues;
 import android.provider.Telephony.Sms;
 import android.provider.Telephony.Sms.Intents;
 import android.provider.Telephony.Threads;
+import android.provider.Telephony.ThreadsColumns;
 import android.telephony.AnomalyReporter;
 import android.telephony.SubscriptionManager;
 import android.text.format.DateFormat;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.telephony.flags.Flags;
 import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.TelephonyStatsLog;
 
@@ -132,6 +137,64 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                         "        AND (m_type=132 OR m_type=130 OR m_type=128)" +
                         "        AND " + Mms.MESSAGE_BOX + " != 3) " +
                         "  WHERE threads._id = old.thread_id; ";
+
+    // When a new pdu row is inserted, if the read restriction bit is not set, update the read
+    // restriction of the thread.
+    private static final String UPDATE_THREAD_READ_RESTRICTION_ON_INSERT_PDU_TRIGGER =
+                        "CREATE TRIGGER IF NOT EXISTS" +
+                        " update_thread_read_restriction_on_insert_pdu " +
+                        " AFTER INSERT ON pdu " +
+                        " WHEN new.read_restriction & " +
+                        ReadRestrictionValues.READ_RESTRICTION_RESTRICTED + " = 0 " +
+                        " BEGIN " +
+                        "   UPDATE threads SET " +
+                        "     read_restriction = read_restriction & " +
+                        "~" + ReadRestrictionValues.READ_RESTRICTION_RESTRICTED +
+                        "     WHERE threads._id = new.thread_id; " +
+                        " END;";
+
+    // When an existing pdu message becomes unrestricted, propagate the change to the thread.
+    private static final String UPDATE_THREAD_READ_RESTRICTION_ON_UPDATE_PDU_TRIGGER =
+                        "CREATE TRIGGER IF NOT EXISTS " +
+                        " update_thread_read_restriction_on_update_pdu " +
+                        " AFTER UPDATE OF read_restriction ON pdu " +
+                        " WHEN new.read_restriction & " +
+                        ReadRestrictionValues.READ_RESTRICTION_RESTRICTED + " = 0 " +
+                        " BEGIN " +
+                        "   UPDATE threads SET " +
+                        "     read_restriction = read_restriction & " +
+                        "~" + ReadRestrictionValues.READ_RESTRICTION_RESTRICTED +
+                        "     WHERE threads._id = new.thread_id; " +
+                        " END;";
+
+    // When a new pdu row is inserted, if the read restriction bit is not set, update the read
+    // restriction of the thread.
+    private static final String UPDATE_THREAD_READ_RESTRICTION_ON_INSERT_SMS_TRIGGER =
+                        "CREATE TRIGGER IF NOT EXISTS" +
+                        " update_thread_read_restriction_on_insert_sms " +
+                        " AFTER INSERT ON sms " +
+                        " WHEN new.read_restriction & " +
+                        ReadRestrictionValues.READ_RESTRICTION_RESTRICTED + " = 0 " +
+                        " BEGIN " +
+                        "   UPDATE threads SET " +
+                        "     read_restriction = read_restriction & " +
+                        "~" + ReadRestrictionValues.READ_RESTRICTION_RESTRICTED +
+                        "     WHERE threads._id = new.thread_id; " +
+                        " END;";
+
+    // When an existing sms message becomes unrestricted, propagate the change to the thread.
+    private static final String UPDATE_THREAD_READ_RESTRICTION_ON_UPDATE_SMS_TRIGGER =
+                        "CREATE TRIGGER IF NOT EXISTS" +
+                        " update_thread_read_restriction_on_update_sms " +
+                        " AFTER UPDATE OF read_restriction ON sms " +
+                        " WHEN new.read_restriction & " +
+                        ReadRestrictionValues.READ_RESTRICTION_RESTRICTED + " = 0 " +
+                        " BEGIN " +
+                        "   UPDATE threads SET " +
+                        "     read_restriction = read_restriction & " +
+                        "~" + ReadRestrictionValues.READ_RESTRICTION_RESTRICTED +
+                        "     WHERE threads._id = new.thread_id; " +
+                        " END;";
 
     private static final String SMS_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE =
                         "BEGIN" +
@@ -266,7 +329,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 70;
+    static final int DATABASE_VERSION = 71;
     private static final int IDLE_CONNECTION_TIMEOUT_MS = 30000;
 
     private final Context mContext;
@@ -687,7 +750,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                         cv.put(Telephony.MmsSms.WordsTable.INDEXED_TEXT, body);
                         cv.put(Telephony.MmsSms.WordsTable.SOURCE_ROW_ID, id);
                         cv.put(Telephony.MmsSms.WordsTable.TABLE_ID, 2);
-                        cv.put(MmsSms.WordsTable.SUBSCRIPTION_ID, -1);
+                        cv.put(Telephony.MmsSms.WordsTable.SUBSCRIPTION_ID, -1);
                         db.insert(TABLE_WORDS, Telephony.MmsSms.WordsTable.INDEXED_TEXT, cv);
                     }
                 }
@@ -862,7 +925,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                     + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
             Mms.SEEN + " INTEGER DEFAULT 0," +
             Mms.CREATOR + " TEXT," +
-            Mms.TEXT_ONLY + " INTEGER DEFAULT 0);";
+            Mms.TEXT_ONLY + " INTEGER DEFAULT 0," +
+            Mms.READ_RESTRICTION + " INTEGER DEFAULT 0);";
 
     @VisibleForTesting
     public static String CREATE_RATE_TABLE_STR =
@@ -1088,6 +1152,11 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "  UPDATE threads SET error = error - 1" +
                    "  WHERE _id = OLD.thread_id; " +
                    "END;");
+
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            db.execSQL(UPDATE_THREAD_READ_RESTRICTION_ON_INSERT_PDU_TRIGGER);
+            db.execSQL(UPDATE_THREAD_READ_RESTRICTION_ON_UPDATE_PDU_TRIGGER);
+        }
     }
 
     // N.B.: Whenever the columns here are changed, the columns in
@@ -1117,7 +1186,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             "error_code INTEGER DEFAULT " + NO_ERROR_CODE + ", " +
             "creator TEXT," +
             "seen INTEGER DEFAULT 0," +
-            "contains_otp INTEGER DEFAULT 0" +
+            "contains_otp INTEGER DEFAULT 0," +
+            "read_restriction INTEGER DEFAULT 0" +
             ");";
 
     @VisibleForTesting
@@ -1218,7 +1288,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE canonical_addresses (" +
                    "_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                    "address TEXT," +
-                   Telephony.CanonicalAddressesColumns.SUBSCRIPTION_ID + " INTEGER DEFAULT -1"
+                   Telephony.CanonicalAddressesColumns.SUBSCRIPTION_ID + " INTEGER DEFAULT -1," +
+                   Telephony.CanonicalAddressesColumns.READ_RESTRICTION + " INTEGER DEFAULT 0"
                 + ");");
 
         /**
@@ -1241,7 +1312,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Threads.TYPE + " INTEGER DEFAULT 0," +
                    Threads.ERROR + " INTEGER DEFAULT 0," +
                    Threads.HAS_ATTACHMENT + " INTEGER DEFAULT 0," +
-                   Threads.SUBSCRIPTION_ID + " INTEGER DEFAULT -1" +
+                   Threads.SUBSCRIPTION_ID + " INTEGER DEFAULT -1," +
+                   Threads.READ_RESTRICTION + " INTEGER DEFAULT 0" +
                 ");");
 
         /**
@@ -1267,6 +1339,11 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         // Updates threads table whenever a message is added to sms.
         db.execSQL("CREATE TRIGGER sms_update_thread_on_insert AFTER INSERT ON sms " +
                    SMS_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE);
+
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            db.execSQL(UPDATE_THREAD_READ_RESTRICTION_ON_INSERT_SMS_TRIGGER);
+            db.execSQL(UPDATE_THREAD_READ_RESTRICTION_ON_UPDATE_SMS_TRIGGER);
+        }
 
         // Updates threads table whenever a message in sms is updated.
         db.execSQL("CREATE TRIGGER sms_update_thread_date_subject_on_update AFTER" +
@@ -1855,6 +1932,21 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             } finally {
                 db.endTransaction();
             }
+            // fall through
+        case 70:
+            if (currentVersion <= 70) {
+                return;
+            }
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion71(db, oldVersion, currentVersion);
+                db.setTransactionSuccessful();
+            } catch(Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break; // force to destroy all old data;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -2219,6 +2311,30 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    private void upgradeDatabaseToVersion71(SQLiteDatabase db, int oldVersion, int currentVersion) {
+        try {
+            db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS
+                    + " ADD COLUMN " + Sms.READ_RESTRICTION + " INTEGER DEFAULT 0");
+            db.execSQL("UPDATE " + SmsProvider.TABLE_SMS + " SET " + Sms.READ_RESTRICTION + " = 0");
+            db.execSQL("ALTER TABLE " + MmsProvider.TABLE_PDU +
+                    " ADD COLUMN " + Mms.READ_RESTRICTION + " INTEGER DEFAULT 0");
+            db.execSQL("UPDATE " + MmsProvider.TABLE_PDU + " SET " + Mms.READ_RESTRICTION + " = 0");
+            db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_THREADS +
+                    " ADD COLUMN " + ThreadsColumns.READ_RESTRICTION + " INTEGER DEFAULT 0");
+            db.execSQL("UPDATE " + MmsSmsProvider.TABLE_THREADS + " SET "
+                    + ThreadsColumns.READ_RESTRICTION + " = 0");
+            db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_CANONICAL_ADDRESSES +
+                    " ADD COLUMN " + CanonicalAddressesColumns.READ_RESTRICTION +
+                    " INTEGER DEFAULT 0");
+            db.execSQL("UPDATE " + MmsSmsProvider.TABLE_CANONICAL_ADDRESSES + " SET "
+                    + CanonicalAddressesColumns.READ_RESTRICTION + " = 0");
+        } catch (SQLiteException e) {
+            Log.e(TAG, "[upgradeDatabaseToVersion71] Exception adding column read_restriction; "
+                    + e);
+            logException(e, oldVersion, currentVersion, 71);
+        }
+    }
+
     @Override
     public synchronized  SQLiteDatabase getReadableDatabase() {
         SQLiteDatabase db;
@@ -2418,8 +2534,9 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 Threads.TYPE + " INTEGER DEFAULT 0," +
                 Threads.ERROR + " INTEGER DEFAULT 0," +
                 Threads.HAS_ATTACHMENT + " INTEGER DEFAULT 0," +
-                Threads.SUBSCRIPTION_ID + " INTEGER DEFAULT -1"
-                +");");
+                Threads.SUBSCRIPTION_ID + " INTEGER DEFAULT -1," +
+                Threads.READ_RESTRICTION + " INTEGER DEFAULT 0" +
+                ");");
 
         db.execSQL("INSERT INTO threads_temp SELECT * from threads;");
         db.execSQL("DROP TABLE threads;");
@@ -2442,7 +2559,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         // table. Drop the old table and rename the new table to that of the old.
         db.execSQL("CREATE TABLE canonical_addresses_temp (_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "address TEXT," +
-                Telephony.CanonicalAddressesColumns.SUBSCRIPTION_ID + " INTEGER DEFAULT -1" +
+                Telephony.CanonicalAddressesColumns.SUBSCRIPTION_ID + " INTEGER DEFAULT -1," +
+                Telephony.CanonicalAddressesColumns.READ_RESTRICTION + " INTEGER DEFAULT 0" +
                 ");");
 
         db.execSQL("INSERT INTO canonical_addresses_temp SELECT * from canonical_addresses;");
@@ -2539,7 +2657,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 Mms.SUBSCRIPTION_ID + " INTEGER DEFAULT "
                         + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
                 Mms.SEEN + " INTEGER DEFAULT 0," +
-                Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
+                Mms.TEXT_ONLY + " INTEGER DEFAULT 0," +
+                Mms.READ_RESTRICTION + " INTEGER DEFAULT 0" +
                 ");");
 
         db.execSQL("INSERT INTO pdu_temp SELECT * from pdu;");

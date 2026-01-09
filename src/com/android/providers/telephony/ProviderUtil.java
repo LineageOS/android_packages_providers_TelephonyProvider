@@ -76,10 +76,11 @@ public class ProviderUtil {
      * @return true if the caller is system or phone, or has the app op, false otherwise
      */
     public static boolean canReadRestrictedMessages(Context context, String packageName, int uid) {
-        if(TelephonyPermissions.isSystemOrPhone(uid)) {
+        if(!Flags.secureAccessToRestrictedRcsMessages() ||
+                TelephonyPermissions.isSystemOrPhone(uid)) {
             return true;
         }
-        int op = context.getSystemService(AppOpsManager.class).noteOpNoThrow(
+        int op = ((AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE)).noteOpNoThrow(
                 AppOpsManager.OP_READ_RESTRICTED_MESSAGES, uid, packageName, null, null);
         return op == AppOpsManager.MODE_ALLOWED;
     }
@@ -93,10 +94,11 @@ public class ProviderUtil {
      * @return true if the caller is system or phone, or has the app op, false otherwise
      */
     public static boolean canWriteRestrictedMessages(Context context, String packageName, int uid) {
-        if(TelephonyPermissions.isSystemOrPhone(uid)) {
+        if(!Flags.secureAccessToRestrictedRcsMessages() ||
+                TelephonyPermissions.isSystemOrPhone(uid)) {
             return true;
         }
-        int op = context.getSystemService(AppOpsManager.class).noteOpNoThrow(
+        int op = ((AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE)).noteOpNoThrow(
                 AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES, uid, packageName, null, null);
         return op == AppOpsManager.MODE_ALLOWED;
     }
@@ -183,12 +185,14 @@ public class ProviderUtil {
      * Get subscriptions associated with the user in the format of a selection string.
      * @param context context
      * @param userHandle caller user handle.
+     * @param tableName table name to be used in the selection string. If null, no prefix will be
+     * added to the selection string.
      * @return subscriptions associated with the user in the format of a selection string
      * or {@code null} if user is not associated with any subscription.
      */
     @Nullable
     public static String getSelectionBySubIds(Context context,
-            @NonNull final UserHandle userHandle) {
+            @NonNull final UserHandle userHandle, @Nullable String tableName) {
         List<SubscriptionInfo> associatedSubscriptionsList = new ArrayList<>();
         SubscriptionManager subManager = context.getSystemService(SubscriptionManager.class);
         UserManager userManager = context.getSystemService(UserManager.class);
@@ -239,12 +243,14 @@ public class ProviderUtil {
             return null;
         }
 
+        final String tableNamePrefix = tableName == null ? "" : tableName + ".";
         // Converts [1,2,3,4,-1] to "'1','2','3','4','-1'" so that it can be appended to
         // selection string
         String subIdListStr = associatedSubscriptionsList.stream()
                 .map(subInfo -> ("'" + subInfo.getSubscriptionId() + "'"))
                 .collect(Collectors.joining(","));
-        String selectionBySubId = (Telephony.Sms.SUBSCRIPTION_ID + " IN (" + subIdListStr + ")");
+        String selectionBySubId = (tableNamePrefix + Telephony.Sms.SUBSCRIPTION_ID +
+                " IN (" + subIdListStr + ")");
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.d(TAG, "getSelectionBySubIds: " + selectionBySubId);
         }

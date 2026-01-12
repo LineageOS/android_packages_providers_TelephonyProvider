@@ -31,6 +31,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.UriMatcher;
 import android.content.pm.PackageManager;
+import android.content.pm.verify.domain.DomainVerificationInfo;
+import android.content.pm.verify.domain.DomainVerificationManager;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.MatrixCursor;
@@ -73,6 +75,7 @@ import com.android.internal.telephony.util.TelephonyUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -141,6 +144,7 @@ public class SmsProvider extends ContentProvider {
     };
 
     private static final Integer ONE = Integer.valueOf(1);
+    private static final int MAX_ALLOWED_VERIFIED_DOMAINS = 5;
 
     private static final String[] CONTACT_QUERY_PROJECTION =
             new String[] { Contacts.Phones.PERSON_ID };
@@ -565,6 +569,11 @@ public class SmsProvider extends ContentProvider {
                                 callingPackage, Binder.getCallingUserHandle())) {
                   where.append(String.format(" OR %s", getContainsGenericOtpSqlFilter()));
                 }
+                // Note: For backwards compatibility, we allow read access to verified owners of
+                // the domain found in Web OTPs.
+                if (android.view.flags.Flags.redactWebOtpSmsApi()) {
+                    where.append(getVerifiedDomainSql(callingPackage));
+                }
                 qb.appendWhereStandalone(where.toString());
             }
 
@@ -594,6 +603,60 @@ public class SmsProvider extends ContentProvider {
                Telephony.Sms.CONTAINS_OTP,
                Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
                Telephony.Sms.OTP_SUBTYPE_NONE | Telephony.Sms.OTP_TYPE_CONTAINS_OTP);
+    }
+
+    // Returns SQL string to be appended to the where clause of the main query which will match
+    // Web OTP rows containing a verified domain owned by `callingPackageName`.
+    // Returns an empty string if the package has no verified domains, or if an exception is
+    // encountered.
+    private String getVerifiedDomainSql(String callingPackageName) {
+        try {
+            DomainVerificationManager domainVerificationManager =
+                    getContext().getSystemService(DomainVerificationManager.class);
+            DomainVerificationInfo domainVerificationInfo =
+                    domainVerificationManager.getDomainVerificationInfo(callingPackageName);
+            if (domainVerificationInfo != null
+                    && !domainVerificationInfo.getHostToStateMap().isEmpty()) {
+                StringBuilder verifiedDomainSql = new StringBuilder();
+                for (Map.Entry<String, Integer> hostToVerificationState :
+                        domainVerificationInfo.getHostToStateMap().entrySet()) {
+                    String domain = hostToVerificationState.getKey();
+                    Integer verificationState = hostToVerificationState.getValue();
+                    boolean isDomainVerified =
+                          verificationState == DomainVerificationInfo.STATE_MODIFIABLE_VERIFIED
+                          || verificationState == DomainVerificationInfo.STATE_SUCCESS;
+                    // To avoid performance issue and potential abuse, we currently set a hard-limit
+                    // to the number of verified domains allowed.
+                    if (isDomainVerified && verifiedDomainSql.length()
+                            < MAX_ALLOWED_VERIFIED_DOMAINS) {
+                        // Match a "@<domain> #" substring.
+                        String containsDomainSql = String.format(
+                            "(%s LIKE '%%@%s #%%')", Sms.BODY, domain);
+                        if (verifiedDomainSql.length() != 0) {
+                            verifiedDomainSql.append(" OR ");
+                        }
+                        verifiedDomainSql.append(containsDomainSql);
+                    }
+                }
+                if (verifiedDomainSql.length() != 0) {
+                    // Roughly translates to the following query:
+                    // "OR ((contains_otp & 0xFFFF) = <bitmask for WEB OTP>"
+                    // "AND (body LIKE '%@<domain1> #%' OR body LIKE '%@<domain2> #%' OR ...)"
+                    return String.format(" OR ((%s & %s) = %s AND (%s))",
+                        Telephony.Sms.CONTAINS_OTP,
+                        Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
+                        android.view.flags.Flags.redactOtpAppCompatApi() ?
+                            Telephony.Sms.OTP_SUBTYPE_WEB_OTP | Telephony.Sms.OTP_TYPE_CONTAINS_OTP
+                                : Telephony.Sms.OTP_TYPE_CONTAINS_OTP,
+                        verifiedDomainSql.toString());
+                }
+                return "";
+            }
+            return "";
+        } catch (Exception e) {
+            // In case of exceptions, fail gracefully.
+            return "";
+        }
     }
 
     /**

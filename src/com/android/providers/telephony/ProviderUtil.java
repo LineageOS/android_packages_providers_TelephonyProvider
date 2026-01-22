@@ -24,6 +24,8 @@ import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.RestrictionsManager;
+import android.content.RestrictionEntry;
 import android.net.Uri;
 import android.os.Process;
 import android.os.UserHandle;
@@ -52,6 +54,10 @@ import java.util.stream.Collectors;
 public class ProviderUtil {
     private final static String TAG = "SmsProvider";
     private static final String TELEPHONY_PROVIDER_PACKAGE = "com.android.providers.telephony";
+    // TODO: b/459576374 - Make this restriction entry key public. Currently, this functionality is
+    // owned by the enterprise team and is only available to the Google Messages app.
+    // https://developer.android.com/work/dpc/rcs-messages-archival
+    private static final String MESSAGES_ARCHIVAL_RESTRICTION_KEY = "messages_archival";
 
     /**
      * Check if a caller of the provider has restricted access,
@@ -76,13 +82,45 @@ public class ProviderUtil {
      * @return true if the caller is system or phone, or has the app op, false otherwise
      */
     public static boolean canReadRestrictedMessages(Context context, String packageName, int uid) {
-        if(!Flags.secureAccessToRestrictedRcsMessages() ||
-                TelephonyPermissions.isSystemOrPhone(uid)) {
+        if(!Flags.secureAccessToRestrictedRcsMessages()
+                || TelephonyPermissions.isSystemOrPhone(uid)
+                || isMessagesArchivalApplication(context, packageName)) {
             return true;
         }
         int op = ((AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE)).noteOpNoThrow(
                 AppOpsManager.OP_READ_RESTRICTED_MESSAGES, uid, packageName, null, null);
         return op == AppOpsManager.MODE_ALLOWED;
+    }
+
+    /**
+     * Check if the package name is the messages archival application.
+     *
+     * @param context the context to use
+     * @param packageName the caller package name
+     * @return {@code true} if the package name is the messages archival application,
+     * {@code false} otherwise.
+     */
+    private static boolean isMessagesArchivalApplication(Context context, String packageName) {
+        String defaultSmsAppPackageName = Telephony.Sms.getDefaultSmsPackage(context);
+        if (defaultSmsAppPackageName == null) {
+            return false;
+        }
+        List<RestrictionEntry> entries = ((RestrictionsManager)
+                context.getSystemService(Context.RESTRICTIONS_SERVICE))
+                .getManifestRestrictions(defaultSmsAppPackageName);
+        if (entries == null) {
+            return false;
+        }
+        // TODO: b/459576374 - Register a broadcast receiver with
+        // ACTION_APPLICATION_RESTRICTIONS_CHANGED instead of querying the restriction entry each
+        // time.
+        String archivalAppPackageName = entries.stream()
+                .filter(entry -> entry.getKey().equals(MESSAGES_ARCHIVAL_RESTRICTION_KEY))
+                .findFirst() // Only one app can be set as the archival app at a time.
+                .map(RestrictionEntry::getSelectedString)
+                .orElse(null);
+        return archivalAppPackageName != null && !archivalAppPackageName.isEmpty() &&
+                archivalAppPackageName.equals(packageName);
     }
 
     /**

@@ -81,7 +81,67 @@ public class MmsProvider extends ContentProvider {
     static final String TABLE_RATE = "rate";
     static final String TABLE_DRM  = "drm";
     static final String TABLE_WORDS = "words";
+    /**
+     * This view is a proxy for reading from the {@link #TABLE_PDU} table. It contains all the rows
+     * in the {@link #TABLE_PDU} table.
+     *
+     * View is used here to enforce a uniform projection of columns across all queries:
+     *  - {@link Mms#READ_RESTRICTION} is hidden from the selection.
+     *  - {@link ReadRestriction#RESTRICTED} bit is extracted from the {@link Mms#READ_RESTRICTION}
+     * column and exposed as a boolean (integer) field.
+     */
+    static final String VIEW_PDU_ALL = "pdu_all";
+    /**
+     * This view is a proxy for reading from the {@link #TABLE_PDU} table.
+     *
+     * In comparison to the {@link #VIEW_PDU_ALL}, it is a restricted view which only contains sent
+     * or received messages, without drafts or wap pushes.
+     */
     static final String VIEW_PDU_RESTRICTED = "pdu_restricted";
+    /**
+     * This is the list of columns in the {@link #TABLE_PDU} that are exposed in the selection via
+     * {@link #VIEW_PDU_ALL} or {@link #VIEW_PDU_RESTRICTED}.
+     */
+    static final String[] PDU_SELECTION_COLUMNS = new String[] {
+        Mms._ID,
+        Mms.THREAD_ID,
+        Mms.DATE,
+        Mms.DATE_SENT,
+        Mms.MESSAGE_BOX,
+        Mms.READ,
+        Mms.MESSAGE_ID,
+        Mms.SUBJECT,
+        Mms.SUBJECT_CHARSET,
+        Mms.CONTENT_TYPE,
+        Mms.CONTENT_LOCATION,
+        Mms.EXPIRY,
+        Mms.MESSAGE_CLASS,
+        Mms.MESSAGE_TYPE ,
+        Mms.MMS_VERSION,
+        Mms.MESSAGE_SIZE,
+        Mms.PRIORITY,
+        Mms.READ_REPORT,
+        Mms.REPORT_ALLOWED,
+        Mms.RESPONSE_STATUS,
+        Mms.STATUS,
+        Mms.TRANSACTION_ID,
+        Mms.RETRIEVE_STATUS,
+        Mms.RETRIEVE_TEXT,
+        Mms.RETRIEVE_TEXT_CHARSET,
+        Mms.READ_STATUS,
+        Mms.CONTENT_CLASS,
+        Mms.RESPONSE_TEXT,
+        Mms.DELIVERY_TIME,
+        Mms.DELIVERY_REPORT,
+        Mms.LOCKED,
+        Mms.SUBSCRIPTION_ID,
+        Mms.SEEN,
+        Mms.CREATOR,
+        Mms.TEXT_ONLY,
+        "CAST(CASE WHEN (" + Mms.READ_RESTRICTION + " & " +
+                 ReadRestriction.ReadRestrictionValues.READ_RESTRICTION_RESTRICTED +
+                 ") <> 0 THEN 1 ELSE 0 END AS INTEGER) AS " + ReadRestriction.RESTRICTED
+    };
     private static final String FIELD_UPDATE_NOT_SUPPORTED_ERROR_MESSAGE =
         "MmsProvider does not support updates for this field.";
     private static final String FIELD_INSERT_NOT_SUPPORTED_ERROR_MESSAGE =
@@ -131,10 +191,14 @@ public class MmsProvider extends ContentProvider {
     /**
      * Return the proper view of "pdu" table for the current access status.
      *
-     * @param accessRestricted If the access is restricted
+     * @param accessRestricted If the access is restricted, and should exclude drafts and wap
+     * pushes.
      * @return the table/view name of the mms data
      */
     public static String getPduTable(boolean accessRestricted) {
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            return accessRestricted ? VIEW_PDU_RESTRICTED : VIEW_PDU_ALL;
+        }
         return accessRestricted ? VIEW_PDU_RESTRICTED : TABLE_PDU;
     }
 
@@ -335,7 +399,7 @@ public class MmsProvider extends ContentProvider {
                                 T.read_status AS read_status
                 FROM addr
                 INNER JOIN (SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3,
-                                    ifnull(P1.read_restriction, 0) AS read_restriction,
+                                    ifnull(P1.restricted, 0) AS restricted,
                                     ifnull(P2.st, 0) AS delivery_status,
                                     ifnull(P3.read_status, 0) AS read_status,
                             FROM pdu P1
@@ -345,7 +409,7 @@ public class MmsProvider extends ContentProvider {
                             ON P1.m_id = P3.m_id AND P3.m_type = 136
                             UNION
                             SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3,
-                                    ifnull(P1.read_restriction, 0) AS read_restriction,
+                                    ifnull(P1.restricted, 0) AS restricted,
                                     ifnull(P2.st, 0) AS delivery_status,
                                     ifnull(P3.read_status, 0) AS read_status
                             FROM pdu P1
@@ -359,7 +423,7 @@ public class MmsProvider extends ContentProvider {
                 */
             final String readRestrictionColumnQuery =
                     Flags.secureAccessToRestrictedRcsMessages()
-                        ? "ifnull(P1.read_restriction, 0) AS read_restriction, " : "";
+                        ? "ifnull(P1.restricted, 0) AS restricted, " : "";
             qb.setTables(TABLE_ADDR + " INNER JOIN "
                     + "(SELECT P1._id AS id1, P2._id AS id2, P3._id AS id3, "
                     + readRestrictionColumnQuery
@@ -380,7 +444,7 @@ public class MmsProvider extends ContentProvider {
                     + "ON P1.m_id=P2.m_id AND P2.m_type=134) T "
                     + "ON (msg_id=id2 AND type=151) OR (msg_id=id3 AND type=137)");
             appendWhere(qb, "T.id1 = " + uri.getLastPathSegment());
-            ReadRestriction.appendReadRestrictionToQuery(qb, "T", canReadRestrictedMessages);
+            ReadRestriction.appendRestrictedToQuery(qb, "T", canReadRestrictedMessages);
             qb.setDistinct(true);
     }
 
@@ -410,7 +474,7 @@ public class MmsProvider extends ContentProvider {
             qb.appendWhere(" AND " + TABLE_ADDR + ".type = " + PduHeaders.TO);
         }
         String joinAssignmentClause = pduTable + "._id = " + TABLE_ADDR + ".msg_id";
-        ReadRestriction.appendReadRestrictionToQuery(qb, joinAssignmentClause, pduTable,
+        ReadRestriction.appendRestrictedToQuery(qb, joinAssignmentClause, pduTable,
             canReadRestrictedMessages);
     }
 
@@ -426,7 +490,7 @@ public class MmsProvider extends ContentProvider {
         qb.setTables(TABLE_PART);
         if (Flags.secureAccessToRestrictedRcsMessages()) {
             final String joinAssignmentClause = pduTable + "._id=" + TABLE_PART + ".mid";
-            ReadRestriction.appendReadRestrictionToQuery(qb, joinAssignmentClause, pduTable,
+            ReadRestriction.appendRestrictedToQuery(qb, joinAssignmentClause, pduTable,
                 canReadRestrictedMessages);
         }
     }
@@ -441,7 +505,7 @@ public class MmsProvider extends ContentProvider {
     private void constructQueryForMmsThreads(SQLiteQueryBuilder qb, String pduTable,
         boolean canReadRestrictedMessages) {
         qb.setTables(pduTable + " group by thread_id");
-        ReadRestriction.appendReadRestrictionToQuery(qb, pduTable, canReadRestrictedMessages);
+        ReadRestriction.appendRestrictedToQuery(qb, pduTable, canReadRestrictedMessages);
     }
 
     /**
@@ -456,7 +520,7 @@ public class MmsProvider extends ContentProvider {
         qb.setTables(TABLE_ADDR);
         if (Flags.secureAccessToRestrictedRcsMessages()) {
             final String joinAssignmentClause = pduTable + "._id=" + TABLE_ADDR + ".msg_id";
-            ReadRestriction.appendReadRestrictionToQuery(qb, joinAssignmentClause, pduTable,
+            ReadRestriction.appendRestrictedToQuery(qb, joinAssignmentClause, pduTable,
                 canReadRestrictedMessages);
         }
     }
@@ -470,7 +534,7 @@ public class MmsProvider extends ContentProvider {
     private void constructQueryForAllMms(SQLiteQueryBuilder qb, String pduTable,
         boolean canReadRestrictedMessages) {
         qb.setTables(pduTable);
-        ReadRestriction.appendReadRestrictionToQuery(qb, pduTable, canReadRestrictedMessages);
+        ReadRestriction.appendRestrictedToQuery(qb, pduTable, canReadRestrictedMessages);
     }
 
     /**

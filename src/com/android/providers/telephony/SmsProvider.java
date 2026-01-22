@@ -89,7 +89,54 @@ public class SmsProvider extends ContentProvider {
     static final String TABLE_CANONICAL_ADDRESSES = "canonical_addresses";
     static final String TABLE_SR_PENDING = "sr_pending";
     private static final String TABLE_WORDS = "words";
+    /**
+     * This view is a proxy for reading from the {@link #TABLE_SMS} table. It contains all the rows
+     * in the {@link #TABLE_SMS} table.
+     *
+     * View is used here to enforce a uniform projection of columns across all queries:
+     *  - {@link Sms#READ_RESTRICTION} is hidden from the selection.
+     *  - {@link ReadRestriction#RESTRICTED} bit is extracted from the {@link Sms#READ_RESTRICTION}
+     * column and exposed as a boolean (integer) field.
+     */
+    static final String VIEW_SMS_ALL = "sms_all";
+
+    /**
+     * This view is a proxy for reading from the {@link #TABLE_SMS} table.
+     *
+     * In comparison to the {@link #VIEW_SMS_ALL}, it is a restricted view which only contains sent
+     * or received messages, without drafts.
+     */
     static final String VIEW_SMS_RESTRICTED = "sms_restricted";
+    /**
+     * This is the list of columns in the {@link #TABLE_SMS} that are exposed in the queries via
+     * {@link #VIEW_SMS_ALL} or {@link #VIEW_SMS_RESTRICTED}. {@link #TABLE_SMS} should not
+     * be queried directly.
+     */
+    static final String[] SMS_SELECTION_COLUMNS = new String[] {
+        Sms._ID,
+        Sms.THREAD_ID,
+        Sms.ADDRESS,
+        Sms.PERSON,
+        Sms.DATE,
+        Sms.DATE_SENT,
+        Sms.PROTOCOL,
+        Sms.READ,
+        Sms.STATUS,
+        Sms.TYPE,
+        Sms.REPLY_PATH_PRESENT,
+        Sms.SUBJECT,
+        Sms.BODY,
+        Sms.SERVICE_CENTER,
+        Sms.LOCKED,
+        Sms.SUBSCRIPTION_ID,
+        Sms.ERROR_CODE,
+        Sms.CREATOR,
+        Sms.SEEN,
+        Sms.CONTAINS_OTP,
+        "CAST(CASE WHEN (" + Sms.READ_RESTRICTION + " & " +
+                 ReadRestriction.ReadRestrictionValues.READ_RESTRICTION_RESTRICTED +
+                 ") <> 0 THEN 1 ELSE 0 END AS INTEGER) AS restricted",
+    };
 
     private static final Integer ONE = Integer.valueOf(1);
 
@@ -195,6 +242,9 @@ public class SmsProvider extends ContentProvider {
      * @return the table/view name of the "sms" data
      */
     public static String getSmsTable(boolean accessRestricted) {
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            return accessRestricted ? VIEW_SMS_RESTRICTED : VIEW_SMS_ALL;
+        }
         return accessRestricted ? VIEW_SMS_RESTRICTED : TABLE_SMS;
     }
 
@@ -342,8 +392,7 @@ public class SmsProvider extends ContentProvider {
                         "groups.msg_count AS msg_count");
                 projectionMap.put("delta", null);
                 qb.setProjectionMap(projectionMap);
-                ReadRestriction.appendReadRestrictionToQuery(qb, smsTable,
-                        canReadRestrictedMessages);
+                ReadRestriction.appendRestrictedToQuery(qb, smsTable, canReadRestrictedMessages);
                 break;
 
             case SMS_RAW_MESSAGE:
@@ -744,7 +793,7 @@ public class SmsProvider extends ContentProvider {
     private void constructQueryForAllSms(SQLiteQueryBuilder qb, String smsTable,
         boolean canReadRestrictedMessages) {
         qb.setTables(smsTable);
-        ReadRestriction.appendReadRestrictionToQuery(qb, null, canReadRestrictedMessages);
+        ReadRestriction.appendRestrictedToQuery(qb, null, canReadRestrictedMessages);
     }
 
     /**
@@ -759,7 +808,7 @@ public class SmsProvider extends ContentProvider {
         boolean canReadRestrictedMessages) {
         qb.setTables(TABLE_ATTACHMENTS);
         String joinAssignmentClause = smsTable + "._id=" + TABLE_ATTACHMENTS + ".sms_id";
-        ReadRestriction.appendReadRestrictionToQuery(qb, joinAssignmentClause, smsTable,
+        ReadRestriction.appendRestrictedToQuery(qb, joinAssignmentClause, smsTable,
             canReadRestrictedMessages);
     }
 

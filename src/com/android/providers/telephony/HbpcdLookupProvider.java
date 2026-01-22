@@ -18,25 +18,25 @@
 package com.android.providers.telephony;
 
 import android.content.ContentProvider;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.UriMatcher;
-import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
+import android.database.Cursor;
+import android.database.SQLException;
 import android.net.Uri;
-import android.os.Binder;
 import android.text.TextUtils;
 import android.util.Log;
+import java.util.HashMap;
 
 import com.android.internal.telephony.HbpcdLookup;
-import com.android.internal.telephony.HbpcdLookup.ArbitraryMccSidMatch;
 import com.android.internal.telephony.HbpcdLookup.MccIdd;
 import com.android.internal.telephony.HbpcdLookup.MccLookup;
 import com.android.internal.telephony.HbpcdLookup.MccSidConflicts;
+import com.android.internal.telephony.HbpcdLookup.ArbitraryMccSidMatch;
 import com.android.internal.telephony.HbpcdLookup.MccSidRange;
 import com.android.internal.telephony.HbpcdLookup.NanpAreaCode;
-
-import java.util.HashMap;
 
 public class HbpcdLookupProvider extends ContentProvider {
     private static boolean DBG = false;
@@ -168,17 +168,6 @@ public class HbpcdLookupProvider extends ContentProvider {
     @Override
     public Cursor query(Uri uri, String[] projectionIn, String selection,
                         String[] selectionArgs, String sortOrder) {
-        final boolean accessRestricted = ProviderUtil.isAccessRestricted(
-                getContext(), getCallingPackage(), Binder.getCallingUid());
-        if (accessRestricted) {
-            try {
-                SqlQueryChecker.checkQueryParametersForSubqueries(
-                        projectionIn, selection, sortOrder);
-            } catch (IllegalArgumentException e) {
-                Log.w(TAG, "Query rejected: " + e.getMessage());
-                return null;
-            }
-        }
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
         String orderBy = null;
         String groupBy = null;

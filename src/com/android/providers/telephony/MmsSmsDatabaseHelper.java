@@ -329,7 +329,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 71;
+    static final int DATABASE_VERSION = 72;
     private static final int IDLE_CONNECTION_TIMEOUT_MS = 30000;
 
     private final Context mContext;
@@ -943,6 +943,32 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             "sub_id INTEGER DEFAULT -1" +
                     ");";
 
+    public static String CREATE_VIEW_SMS_ALL_STR =
+            "CREATE VIEW " + SmsProvider.VIEW_SMS_ALL + " AS " +
+            "SELECT " + String.join(", ", SmsProvider.SMS_SELECTION_COLUMNS) +
+            " FROM " + SmsProvider.TABLE_SMS + ";";
+
+    public static String CREATE_VIEW_SMS_RESTRICTED_STR =
+            "CREATE VIEW " + SmsProvider.VIEW_SMS_RESTRICTED + " AS " +
+            "SELECT * FROM " + SmsProvider.VIEW_SMS_ALL +
+            " WHERE " + Sms.TYPE + "=" + Sms.MESSAGE_TYPE_INBOX +
+            " OR " + Sms.TYPE + "=" + Sms.MESSAGE_TYPE_SENT + ";";
+
+    public static String CREATE_VIEW_PDU_ALL_STR =
+            "CREATE VIEW " + MmsProvider.VIEW_PDU_ALL + " AS " +
+            "SELECT " + String.join(", ", MmsProvider.PDU_SELECTION_COLUMNS) +
+            " FROM " + MmsProvider.TABLE_PDU + ";";
+
+    public static String CREATE_VIEW_PDU_RESTRICTED_STR =
+            "CREATE VIEW " + MmsProvider.VIEW_PDU_RESTRICTED + "  AS " +
+            "SELECT * " +
+            " FROM " + MmsProvider.VIEW_PDU_ALL + " WHERE " +
+            "(" + Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_INBOX +
+            " OR " +
+            Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_SENT + ")" +
+            " AND " +
+            "(" + Mms.MESSAGE_TYPE + "!=" + PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND
+            + ");";
 
     @VisibleForTesting
     void createMmsTables(SQLiteDatabase db) {
@@ -960,13 +986,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(CREATE_DRM_TABLE_STR);
 
         // Restricted view of pdu table, only sent/received messages without wap pushes
-        db.execSQL("CREATE VIEW " + MmsProvider.VIEW_PDU_RESTRICTED + " AS " +
-                "SELECT * FROM " + MmsProvider.TABLE_PDU + " WHERE " +
-                "(" + Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_INBOX +
-                " OR " +
-                Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_SENT + ")" +
-                " AND " +
-                "(" + Mms.MESSAGE_TYPE + "!=" + PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND + ");");
+        db.execSQL(CREATE_VIEW_PDU_ALL_STR);
+        db.execSQL(CREATE_VIEW_PDU_RESTRICTED_STR);
     }
 
     // Unlike the other trigger-creating functions, this function can be called multiple times
@@ -1241,11 +1262,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 ");");
 
         // Restricted view of sms table, only sent/received messages
-        db.execSQL("CREATE VIEW " + SmsProvider.VIEW_SMS_RESTRICTED + " AS " +
-                   "SELECT * FROM " + SmsProvider.TABLE_SMS + " WHERE " +
-                   Sms.TYPE + "=" + Sms.MESSAGE_TYPE_INBOX +
-                   " OR " +
-                   Sms.TYPE + "=" + Sms.MESSAGE_TYPE_SENT + ";");
+        db.execSQL(CREATE_VIEW_SMS_ALL_STR);
+        db.execSQL(CREATE_VIEW_SMS_RESTRICTED_STR);
 
         if (mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
             // Create a table to keep track of changes to SMS table - specifically on update to read
@@ -1947,6 +1965,21 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             } finally {
                 db.endTransaction();
             }
+            // fall through
+        case 71:
+            if (currentVersion <= 71) {
+                return;
+            }
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion72(db, oldVersion, currentVersion);
+                db.setTransactionSuccessful();
+            } catch(Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break; // force to destroy all old data;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -2201,7 +2234,6 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_SENT + ")" +
                    " AND " +
                    "(" + Mms.MESSAGE_TYPE + "!=" + PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND + ");");
-
     }
 
     private void upgradeDatabaseToVersion62(SQLiteDatabase db, int oldVersion, int currentVersion) {
@@ -2332,6 +2364,21 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "[upgradeDatabaseToVersion71] Exception adding column read_restriction; "
                     + e);
             logException(e, oldVersion, currentVersion, 71);
+        }
+    }
+
+    private void upgradeDatabaseToVersion72(SQLiteDatabase db, int oldVersion, int currentVersion) {
+        try {
+            db.execSQL("DROP VIEW IF EXISTS " + SmsProvider.VIEW_SMS_RESTRICTED + ";");
+            db.execSQL("DROP VIEW IF EXISTS " + MmsProvider.VIEW_PDU_RESTRICTED + ";");
+            db.execSQL(CREATE_VIEW_SMS_ALL_STR);
+            db.execSQL(CREATE_VIEW_SMS_RESTRICTED_STR);
+            db.execSQL(CREATE_VIEW_PDU_ALL_STR);
+            db.execSQL(CREATE_VIEW_PDU_RESTRICTED_STR);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "[upgradeDatabaseToVersion72] Exception creating sms/pdu views; "
+                    + e);
+            logException(e, oldVersion, currentVersion, 72);
         }
     }
 

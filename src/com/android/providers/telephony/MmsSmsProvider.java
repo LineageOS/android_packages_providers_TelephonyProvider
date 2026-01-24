@@ -877,12 +877,12 @@ public class MmsSmsProvider extends ContentProvider {
             final String[] projection = new String[] {ThreadsColumns._ID};
             final SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
             qb.setTables(TABLE_THREADS);
-            qb.appendWhereStandalone(ThreadsColumns.RECIPIENT_IDS + "=" + recipientIds);
+            qb.appendWhereStandalone(ThreadsColumns.RECIPIENT_IDS + " = ?");
             if (!canReadRestrictedMessages) {
                 ReadRestriction.appendReadRestrictionToQuery(qb, TABLE_THREADS,
                     canReadRestrictedMessages);
             }
-            return qb.query(db, projection, null, null, null, null, null);
+            return qb.query(db, projection, null, new String[] { recipientIds }, null, null, null);
         } else {
             return db.rawQuery(THREAD_QUERY, new String[] { recipientIds });
         }

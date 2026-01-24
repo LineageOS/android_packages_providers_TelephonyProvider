@@ -196,6 +196,30 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                         "     WHERE threads._id = new.thread_id; " +
                         " END;";
 
+    // When the thread becomes unrestricted, propagate the change to the canonical addresses
+    // referenced by the thread.
+    private static final String UPDATE_CANONICAL_ADDRESS_ON_THREAD_RESTRICTION_CHANGE_TRIGGER =
+                    "CREATE TRIGGER IF NOT EXISTS" +
+                    " propagate_thread_read_restriction_to_canonical_addresses " +
+                    " AFTER UPDATE OF read_restriction ON threads " +
+                    // Only fire if we are effectively un-restricting the thread
+                    " WHEN (OLD.read_restriction &" +
+                        ReadRestrictionValues.READ_RESTRICTION_RESTRICTED + ") <> 0 " +
+                        " AND (NEW.read_restriction & " +
+                        ReadRestrictionValues.READ_RESTRICTION_RESTRICTED + ") == 0 " +
+                    " BEGIN " +
+                    "   UPDATE canonical_addresses " +
+                    "   SET read_restriction = (read_restriction & ~" +
+                    ReadRestrictionValues.READ_RESTRICTION_RESTRICTED + ") " +
+                    // Extracts the recipient_ids from the updated row and checks if the canonical
+                    // address row ID is present in the recipient_ids list.
+                    // The canonical_addresses table has a row ID that is the same as the
+                    // recipient_id in the threads table.
+                    // Empty space is added to both sides to ensure that the string
+                    // concatenation doesn't cause partial matches.
+                    "   WHERE instr(' ' || NEW.recipient_ids || ' ', ' ' || _id || ' ') > 0; " +
+                    " END;";
+
     private static final String SMS_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE =
                         "BEGIN" +
                         "  UPDATE threads SET" +
@@ -1442,6 +1466,10 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "    END " +
                    "  WHERE _id = NEW.thread_id; " +
                    "END;");
+
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            db.execSQL(UPDATE_CANONICAL_ADDRESS_ON_THREAD_RESTRICTION_CHANGE_TRIGGER);
+        }
     }
 
     @Override

@@ -170,39 +170,43 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         mSmsRows = new ContentValues[4];
         mSmsJson = new String[4];
         mSmsRows[0] = createSmsRow(1, 1, "+1232132214124", "sms 1", "sms subject", 9087978987l,
-                999999999, 3, 44, 1, false, /* isReadRestricted= */ false);
+                999999999, 3, 44, 1, false, /* isReadRestricted= */ false,
+                /*transactionId*/"tr_id");
         mSmsJson[0] = "{\"self_phone\":\"+111111111111111\",\"address\":" +
                 "\"+1232132214124\",\"body\":\"sms 1\",\"subject\":\"sms subject\",\"date\":" +
                 "\"9087978987\",\"date_sent\":\"999999999\",\"status\":\"3\",\"type\":\"44\"," +
                 "\"recipients\":[\"+123 (213) 2214124\"],\"archived\":true,\"read\":\"0\"," +
-                "\"restricted\":\"0\"}";
+                "\"restricted\":\"0\",\"tr_id\":\"tr_id\"}";
         mThreadProvider.setArchived(
                 mThreadProvider.getOrCreateThreadId(new String[]{"+123 (213) 2214124"}));
 
         mSmsRows[1] = createSmsRow(2, 2, "+1232132214124", "sms 2", null, 9087978987l, 999999999,
-                0, 4, 1, true, /* isReadRestricted= */ false);
+                0, 4, 1, true, /* isReadRestricted= */ false, /*transactionId*/"tr_id");
         mSmsJson[1] = "{\"address\":\"+1232132214124\",\"body\":\"sms 2\",\"date\":" +
                 "\"9087978987\",\"date_sent\":\"999999999\",\"status\":\"0\",\"type\":\"4\"," +
-                "\"recipients\":[\"+123 (213) 2214124\"],\"read\":\"1\",\"restricted\":\"0\"}";
+                "\"recipients\":[\"+123 (213) 2214124\"],\"read\":\"1\",\"restricted\":\"0\"," +
+                "\"tr_id\":\"tr_id\"}";
 
         mSmsRows[2] = createSmsRow(4, 3, "+1232221412433 +1232221412444", "sms 3", null,
-                111111111111l, 999999999, 2, 3, 2, false, /* isReadRestricted= */ false);
+                111111111111l, 999999999, 2, 3, 2, false, /* isReadRestricted= */ false,
+                /*transactionId*/"tr_id");
         mSmsJson[2] =  "{\"self_phone\":\"+333333333333333\",\"address\":" +
                 "\"+1232221412433 +1232221412444\",\"body\":\"sms 3\",\"date\":\"111111111111\"," +
                 "\"date_sent\":" +
                 "\"999999999\",\"status\":\"2\",\"type\":\"3\"," +
                 "\"recipients\":[\"+1232221412433\",\"+1232221412444\"],\"read\":\"0\"," +
-                "\"restricted\":\"0\"}";
+                "\"restricted\":\"0\",\"tr_id\":\"tr_id\"}";
         mThreadProvider.getOrCreateThreadId(new String[]{"+1232221412433", "+1232221412444"});
 
 
         mSmsRows[3] = createSmsRow(5, 3, null, "sms 4", null,
-                111111111111l, 999999999, 2, 3, 5, false, /* isReadRestricted= */ true);
+                111111111111l, 999999999, 2, 3, 5, false, /* isReadRestricted= */ true,
+                /*transactionId*/"tr_id");
         mSmsJson[3] = "{\"self_phone\":\"+333333333333333\"," +
                 "\"body\":\"sms 4\",\"date\":\"111111111111\"," +
                 "\"date_sent\":" +
                 "\"999999999\",\"status\":\"2\",\"type\":\"3\",\"read\":\"0\"," +
-                "\"restricted\":\"1\"}";
+                "\"restricted\":\"1\",\"tr_id\":\"tr_id\"}";
 
         mAllSmsJson = makeJsonArray(mSmsJson);
 
@@ -391,7 +395,8 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
     private static ContentValues createSmsRow(int id, int subId, String address, String body,
                                               String subj, long date, long dateSent,
                                               int status, int type, long threadId,
-                                              boolean read, boolean isReadRestricted) {
+                                              boolean read, boolean isReadRestricted,
+                                              String transactionId) {
         ContentValues smsRow = new ContentValues();
         smsRow.put(Telephony.Sms._ID, id);
         smsRow.put(Telephony.Sms.SUBSCRIPTION_ID, subId);
@@ -411,6 +416,7 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         smsRow.put(Telephony.Sms.THREAD_ID, threadId);
         smsRow.put(Telephony.Sms.READ, read ? "1" : "0");
         smsRow.put(Telephony.ReadRestriction.RESTRICTED, isReadRestricted ? "1" : "0");
+        smsRow.put(Telephony.Sms.TRANSACTION_ID, transactionId);
 
         return smsRow;
     }

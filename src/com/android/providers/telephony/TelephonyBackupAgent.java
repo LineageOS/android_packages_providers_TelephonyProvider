@@ -216,7 +216,8 @@ public class TelephonyBackupAgent extends BackupAgent {
             Telephony.Sms.TYPE,
             Telephony.Sms.THREAD_ID,
             Telephony.Sms.READ,
-            Telephony.ReadRestriction.RESTRICTED
+            Telephony.ReadRestriction.RESTRICTED,
+            Telephony.Sms.TRANSACTION_ID,
     };
 
     // Columns to fetch recepients of SMS.
@@ -1097,6 +1098,7 @@ public class TelephonyBackupAgent extends BackupAgent {
                 case Telephony.Sms.ADDRESS:
                 case Telephony.Sms.READ:
                 case Telephony.ReadRestriction.RESTRICTED:
+                case Telephony.Sms.TRANSACTION_ID:
                     values.put(name, jsonReader.nextString());
                     break;
                 case RECIPIENTS:

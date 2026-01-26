@@ -215,7 +215,8 @@ public class TelephonyBackupAgent extends BackupAgent {
             Telephony.Sms.STATUS,
             Telephony.Sms.TYPE,
             Telephony.Sms.THREAD_ID,
-            Telephony.Sms.READ
+            Telephony.Sms.READ,
+            Telephony.ReadRestriction.RESTRICTED
     };
 
     // Columns to fetch recepients of SMS.
@@ -239,7 +240,8 @@ public class TelephonyBackupAgent extends BackupAgent {
             Telephony.Mms.CONTENT_LOCATION,
             Telephony.Mms.THREAD_ID,
             Telephony.Mms.TRANSACTION_ID,
-            Telephony.Mms.READ
+            Telephony.Mms.READ,
+            Telephony.ReadRestriction.RESTRICTED
     };
 
     // Columns from addr database for backup/restore. This database is used for fetching addresses
@@ -1094,6 +1096,7 @@ public class TelephonyBackupAgent extends BackupAgent {
                 case Telephony.Sms.SUBJECT:
                 case Telephony.Sms.ADDRESS:
                 case Telephony.Sms.READ:
+                case Telephony.ReadRestriction.RESTRICTED:
                     values.put(name, jsonReader.nextString());
                     break;
                 case RECIPIENTS:
@@ -1249,6 +1252,7 @@ public class TelephonyBackupAgent extends BackupAgent {
                 case Telephony.Mms.CONTENT_LOCATION:
                 case Telephony.Mms.TRANSACTION_ID:
                 case Telephony.Mms.READ:
+                case Telephony.ReadRestriction.RESTRICTED:
                     mms.values.put(name, jsonReader.nextString());
                     break;
                 default:

@@ -170,40 +170,41 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         mSmsRows = new ContentValues[4];
         mSmsJson = new String[4];
         mSmsRows[0] = createSmsRow(1, 1, "+1232132214124", "sms 1", "sms subject", 9087978987l,
-                999999999, 3, 44, 1, false);
+                999999999, 3, 44, 1, false, /* isReadRestricted= */ false);
         mSmsJson[0] = "{\"self_phone\":\"+111111111111111\",\"address\":" +
                 "\"+1232132214124\",\"body\":\"sms 1\",\"subject\":\"sms subject\",\"date\":" +
                 "\"9087978987\",\"date_sent\":\"999999999\",\"status\":\"3\",\"type\":\"44\"," +
-                "\"recipients\":[\"+123 (213) 2214124\"],\"archived\":true,\"read\":\"0\"}";
+                "\"recipients\":[\"+123 (213) 2214124\"],\"archived\":true,\"read\":\"0\"," +
+                "\"restricted\":\"0\"}";
         mThreadProvider.setArchived(
                 mThreadProvider.getOrCreateThreadId(new String[]{"+123 (213) 2214124"}));
 
         mSmsRows[1] = createSmsRow(2, 2, "+1232132214124", "sms 2", null, 9087978987l, 999999999,
-                0, 4, 1, true);
+                0, 4, 1, true, /* isReadRestricted= */ false);
         mSmsJson[1] = "{\"address\":\"+1232132214124\",\"body\":\"sms 2\",\"date\":" +
                 "\"9087978987\",\"date_sent\":\"999999999\",\"status\":\"0\",\"type\":\"4\"," +
-                "\"recipients\":[\"+123 (213) 2214124\"],\"read\":\"1\"}";
+                "\"recipients\":[\"+123 (213) 2214124\"],\"read\":\"1\",\"restricted\":\"0\"}";
 
         mSmsRows[2] = createSmsRow(4, 3, "+1232221412433 +1232221412444", "sms 3", null,
-                111111111111l, 999999999, 2, 3, 2, false);
+                111111111111l, 999999999, 2, 3, 2, false, /* isReadRestricted= */ false);
         mSmsJson[2] =  "{\"self_phone\":\"+333333333333333\",\"address\":" +
                 "\"+1232221412433 +1232221412444\",\"body\":\"sms 3\",\"date\":\"111111111111\"," +
                 "\"date_sent\":" +
                 "\"999999999\",\"status\":\"2\",\"type\":\"3\"," +
-                "\"recipients\":[\"+1232221412433\",\"+1232221412444\"],\"read\":\"0\"}";
+                "\"recipients\":[\"+1232221412433\",\"+1232221412444\"],\"read\":\"0\"," +
+                "\"restricted\":\"0\"}";
         mThreadProvider.getOrCreateThreadId(new String[]{"+1232221412433", "+1232221412444"});
 
 
         mSmsRows[3] = createSmsRow(5, 3, null, "sms 4", null,
-                111111111111l, 999999999, 2, 3, 5, false);
+                111111111111l, 999999999, 2, 3, 5, false, /* isReadRestricted= */ true);
         mSmsJson[3] = "{\"self_phone\":\"+333333333333333\"," +
                 "\"body\":\"sms 4\",\"date\":\"111111111111\"," +
                 "\"date_sent\":" +
-                "\"999999999\",\"status\":\"2\",\"type\":\"3\",\"read\":\"0\"}";
+                "\"999999999\",\"status\":\"2\",\"type\":\"3\",\"read\":\"0\"," +
+                "\"restricted\":\"1\"}";
 
         mAllSmsJson = makeJsonArray(mSmsJson);
-
-
 
         mMmsRows = new ContentValues[3];
         mMmsJson = new String[3];
@@ -215,13 +216,14 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 new String[]{"+111 (111) 11111111", "+11121212", "example@example.com",
                         "+999999999"} /*addresses*/,
                 3 /*threadId*/, false /*read*/, null /*smil*/, null /*attachmentTypes*/,
-                null /*attachmentFilenames*/, mMmsAllContentValues);
+                null /*attachmentFilenames*/, mMmsAllContentValues, /* isReadRestricted= */ false);
 
         mMmsJson[0] = "{\"self_phone\":\"+111111111111111\",\"sub\":\"Subject 1\"," +
                 "\"date\":\"111111\",\"date_sent\":\"111112\",\"m_type\":\"3\",\"v\":\"17\"," +
                 "\"msg_box\":\"11\",\"ct_l\":\"location 1\"," +
                 "\"recipients\":[\"+11121212\",\"example@example.com\",\"+999999999\"]," +
                 "\"read\":\"0\"," +
+                "\"restricted\":\"0\"," +
                 "\"mms_addresses\":" +
                 "[{\"type\":10,\"address\":\"+111 (111) 11111111\",\"charset\":100}," +
                 "{\"type\":11,\"address\":\"+11121212\",\"charset\":101},{\"type\":12,\"address\":"+
@@ -237,11 +239,12 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 121 /*body charset*/,
                 new String[]{"+7 (333) ", "example@example.com", "+999999999"} /*addresses*/,
                 4 /*threadId*/, true /*read*/, null /*smil*/, null /*attachmentTypes*/,
-                null /*attachmentFilenames*/, mMmsAllContentValues);
+                null /*attachmentFilenames*/, mMmsAllContentValues, /* isReadRestricted= */ false);
         mMmsJson[1] = "{\"date\":\"111122\",\"date_sent\":\"1111112\",\"m_type\":\"4\"," +
                 "\"v\":\"18\",\"msg_box\":\"222\",\"ct_l\":\"location 2\"," +
                 "\"recipients\":[\"example@example.com\",\"+999999999\"]," +
                 "\"read\":\"1\"," +
+                "\"restricted\":\"0\"," +
                 "\"mms_addresses\":" +
                 "[{\"type\":10,\"address\":\"+7 (333) \",\"charset\":100}," +
                 "{\"type\":11,\"address\":\"example@example.com\",\"charset\":101}," +
@@ -256,13 +259,14 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 131 /*body charset*/,
                 new String[]{"333 333333333333", "+1232132214124"} /*addresses*/,
                 1 /*threadId*/, false /*read*/, null /*smil*/, null /*attachmentTypes*/,
-                null /*attachmentFilenames*/, mMmsAllContentValues);
+                null /*attachmentFilenames*/, mMmsAllContentValues, /* isReadRestricted= */ true);
 
         mMmsJson[2] = "{\"self_phone\":\"+333333333333333\",\"sub\":\"Subject 10\"," +
                 "\"date\":\"111133\",\"date_sent\":\"1111132\",\"m_type\":\"5\",\"v\":\"19\"," +
                 "\"msg_box\":\"333\"," +
                 "\"recipients\":[\"+123 (213) 2214124\"],\"archived\":true," +
                 "\"read\":\"0\"," +
+                "\"restricted\":\"1\"," +
                 "\"mms_addresses\":" +
                 "[{\"type\":10,\"address\":\"333 333333333333\",\"charset\":100}," +
                 "{\"type\":11,\"address\":\"+1232132214124\",\"charset\":101}]," +
@@ -285,13 +289,15 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                         + " width='100%'/></layout></head><body><par dur='5000ms'>"
                         + "<img src='image000000.jpg' region='Image' /></par></body></smil>",
                 new String[] {"image/jpg"} /*attachmentTypes*/,
-                new String[] {"GreatPict.jpg"}  /*attachmentFilenames*/, mMmsAllContentValues);
+                new String[] {"GreatPict.jpg"}  /*attachmentFilenames*/, mMmsAllContentValues,
+                /* isReadRestricted= */ false);
 
         mMmsAttachmentJson[0] = "{\"self_phone\":\"+111111111111111\",\"sub\":\"Subject 1\"," +
                 "\"date\":\"111111\",\"date_sent\":\"111112\",\"m_type\":\"3\",\"v\":\"17\"," +
                 "\"msg_box\":\"11\",\"ct_l\":\"location 1\"," +
                 "\"recipients\":[\"+11121212\",\"example@example.com\",\"+999999999\"]," +
                 "\"read\":\"0\"," +
+                "\"restricted\":\"0\"," +
                 "\"mms_addresses\":" +
                 "[{\"type\":10,\"address\":\"+111 (111) 11111111\",\"charset\":100}," +
                 "{\"type\":11,\"address\":\"+11121212\",\"charset\":101},{\"type\":12,\"address\":"+
@@ -307,13 +313,15 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 11 /*msgBox*/, "location 1" /*contentLocation*/, "" /*body*/,
                 CharacterSets.DEFAULT_CHARSET /*body charset*/, new String[] {} /*addresses*/,
                 3 /*threadId*/, false /*read*/, null /*smil*/, null /*attachmentTypes*/,
-                null /*attachmentFilenames*/, mMmsNullBodyContentValues);
+                null /*attachmentFilenames*/, mMmsNullBodyContentValues,
+                /* isReadRestricted= */ false);
 
         mMmsAllNullBodyJson = makeJsonArray(new String[] {"{\"self_phone\":\"+111111111111111\"," +
                 "\"sub\":\"Subject 1\",\"date\":\"111111\",\"date_sent\":\"111112\",\"m_type\":" +
                 "\"3\",\"v\":\"17\",\"msg_box\":\"11\",\"ct_l\":\"location 1\"," +
                 "\"recipients\":[\"+11121212\",\"example@example.com\",\"+999999999\"]," +
-                "\"read\":\"0\", \"mms_addresses\":[],\"mms_charset\":111,\"sub_cs\":\"100\"}"});
+                "\"read\":\"0\",\"restricted\":\"0\",\"mms_addresses\":[],\"mms_charset\":111," +
+                "\"sub_cs\":\"100\"}"});
 
 
         ContentProvider contentProvider = new MockContentProvider() {
@@ -383,7 +391,7 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
     private static ContentValues createSmsRow(int id, int subId, String address, String body,
                                               String subj, long date, long dateSent,
                                               int status, int type, long threadId,
-                                              boolean read) {
+                                              boolean read, boolean isReadRestricted) {
         ContentValues smsRow = new ContentValues();
         smsRow.put(Telephony.Sms._ID, id);
         smsRow.put(Telephony.Sms.SUBSCRIPTION_ID, subId);
@@ -402,6 +410,7 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         smsRow.put(Telephony.Sms.TYPE, String.valueOf(type));
         smsRow.put(Telephony.Sms.THREAD_ID, threadId);
         smsRow.put(Telephony.Sms.READ, read ? "1" : "0");
+        smsRow.put(Telephony.ReadRestriction.RESTRICTED, isReadRestricted ? "1" : "0");
 
         return smsRow;
     }
@@ -413,7 +422,8 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                                        int bodyCharset, String[] addresses, long threadId,
                                        boolean read, String smil, String[] attachmentTypes,
                                        String[] attachmentFilenames,
-                                       List<ContentValues> rowsContainer) {
+                                       List<ContentValues> rowsContainer,
+                                       boolean isReadRestricted) {
         ContentValues mmsRow = new ContentValues();
         mmsRow.put(Telephony.Mms._ID, id);
         mmsRow.put(Telephony.Mms.SUBSCRIPTION_ID, subId);
@@ -432,6 +442,7 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         }
         mmsRow.put(Telephony.Mms.THREAD_ID, threadId);
         mmsRow.put(Telephony.Mms.READ, read ? "1" : "0");
+        mmsRow.put(Telephony.ReadRestriction.RESTRICTED, isReadRestricted ? "1" : "0");
 
         final Uri partUri = Telephony.Mms.CONTENT_URI.buildUpon().appendPath(String.valueOf(id)).
                 appendPath("part").build();

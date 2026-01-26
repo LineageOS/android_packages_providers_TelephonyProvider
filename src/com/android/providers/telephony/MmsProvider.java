@@ -709,7 +709,7 @@ public class MmsProvider extends ContentProvider {
                 final boolean canWriteRestrictedMessages = ProviderUtil.canWriteRestrictedMessages(
                         getContext(), callerPkg, callerUid);
                 final int readRestrictionValue =
-                    ReadRestriction.computeReadRestrictionValueOnInsert(values,
+                    ReadRestriction.computeReadRestrictionValueOnInsert(finalValues,
                         canWriteRestrictedMessages);
                 finalValues.put(ReadRestriction.READ_RESTRICTION_COLUMN_NAME, readRestrictionValue);
             }

@@ -133,6 +133,7 @@ public class SmsProvider extends ContentProvider {
         Sms.CREATOR,
         Sms.SEEN,
         Sms.CONTAINS_OTP,
+        Sms.TRANSACTION_ID,
         "CAST(CASE WHEN (" + Sms.READ_RESTRICTION + " & " +
                  ReadRestriction.ReadRestrictionValues.READ_RESTRICTION_RESTRICTED +
                  ") <> 0 THEN 1 ELSE 0 END AS INTEGER) AS restricted",

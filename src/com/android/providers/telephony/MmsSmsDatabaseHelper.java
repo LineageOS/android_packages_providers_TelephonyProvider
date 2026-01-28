@@ -353,7 +353,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 72;
+    static final int DATABASE_VERSION = 73;
     private static final int IDLE_CONNECTION_TIMEOUT_MS = 30000;
 
     private final Context mContext;
@@ -1232,7 +1232,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             "creator TEXT," +
             "seen INTEGER DEFAULT 0," +
             "contains_otp INTEGER DEFAULT 0," +
-            "read_restriction INTEGER DEFAULT 0" +
+            "read_restriction INTEGER DEFAULT 0," +
+            "tr_id TEXT" +
             ");";
 
     @VisibleForTesting
@@ -2008,6 +2009,21 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             } finally {
                 db.endTransaction();
             }
+            // fall through
+        case 72:
+            if (currentVersion <= 72) {
+                return;
+            }
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion73(db, oldVersion, currentVersion);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break; // force to destroy all old data;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -2407,6 +2423,17 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "[upgradeDatabaseToVersion72] Exception creating sms/pdu views; "
                     + e);
             logException(e, oldVersion, currentVersion, 72);
+        }
+    }
+
+    private void upgradeDatabaseToVersion73(SQLiteDatabase db, int oldVersion, int currentVersion) {
+        try {
+            db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS + " ADD COLUMN " + Sms.TRANSACTION_ID
+                    + " TEXT");
+        } catch (SQLiteException e) {
+            Log.e(TAG, "[upgradeDatabaseToVersion73] Exception adding column tr_id; "
+                    + e);
+            logException(e, oldVersion, currentVersion, 73);
         }
     }
 

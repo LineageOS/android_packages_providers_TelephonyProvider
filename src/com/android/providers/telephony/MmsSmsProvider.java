@@ -140,7 +140,7 @@ public class MmsSmsProvider extends ContentProvider {
     // SMS ("sms") message tables.
     private static final String[] MMS_SMS_COLUMNS =
             { BaseColumns._ID, Mms.DATE, Mms.DATE_SENT, Mms.READ, Mms.THREAD_ID, Mms.LOCKED,
-                    Mms.SUBSCRIPTION_ID };
+                    Mms.SUBSCRIPTION_ID, Mms.TRANSACTION_ID };
 
     // These are the columns that appear only in the MMS message
     // table.
@@ -151,7 +151,7 @@ public class MmsSmsProvider extends ContentProvider {
         Mms.READ_STATUS, Mms.RESPONSE_STATUS, Mms.RESPONSE_TEXT,
         Mms.RETRIEVE_STATUS, Mms.RETRIEVE_TEXT_CHARSET, Mms.REPORT_ALLOWED,
         Mms.READ_REPORT, Mms.STATUS, Mms.SUBJECT, Mms.SUBJECT_CHARSET,
-        Mms.TRANSACTION_ID, Mms.MMS_VERSION, Mms.TEXT_ONLY };
+        Mms.MMS_VERSION, Mms.TEXT_ONLY };
 
     // These are the columns that appear only in the SMS message
     // table.

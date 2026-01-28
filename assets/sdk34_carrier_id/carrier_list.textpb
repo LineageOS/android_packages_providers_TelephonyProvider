@@ -7762,9 +7762,17 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 2066
-  carrier_name: "Kajeet (Arterra)"
+  carrier_name: "Kajeet"
   carrier_attribute {
     mccmnc_tuple: "310260"
+    gid1: "6136"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "310240"
+    gid1: "6136"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "311882"
     gid1: "6136"
   }
 }
@@ -10368,7 +10376,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 2422
-  carrier_name: "MTX"
+  carrier_name: "MTX Connect"
   carrier_attribute {
     mccmnc_tuple: "27002"
   }
@@ -12652,7 +12660,6 @@ carrier_id {
   carrier_name: "Spectrum"
   carrier_attribute {
     mccmnc_tuple: "310240"
-    spn: "Spectrum"
     gid1: "BA02"
     gid2: "A700"
   }
@@ -12769,6 +12776,88 @@ carrier_id {
   carrier_name: "GSMA VoLTE Test Profile#4"
   carrier_attribute {
     mccmnc_tuple: "114"
+  }
+}
+carrier_id {
+  canonical_id: 2704
+  carrier_name: "019 Mobile"
+  carrier_attribute {
+    mccmnc_tuple: "425019"
+  }
+}
+carrier_id {
+  canonical_id: 2705
+  carrier_name: "Aptel"
+  carrier_attribute {
+    mccmnc_tuple: "43202"
+    spn: "Aptel"
+  }
+}
+carrier_id {
+  canonical_id: 2706
+  carrier_name: "MTX Connect"
+  carrier_attribute {
+    mccmnc_tuple: "90139"
+  }
+}
+carrier_id {
+  canonical_id: 2707
+  carrier_name: "Voye"
+  carrier_attribute {
+    mccmnc_tuple: "26006"
+    gid1: "566F7965"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "42402"
+    gid1: "566F7965"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "42504"
+    gid1: "566F7965"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "45435"
+    gid1: "566F7965"
+  }
+}
+carrier_id {
+  canonical_id: 2708
+  carrier_name: "Globaltel SPM"
+  carrier_attribute {
+    mccmnc_tuple: "30802"
+    spn: "Globaltel"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "30804"
+    spn: "Globaltel"
+  }
+}
+carrier_id {
+  canonical_id: 2710
+  carrier_name: "DNB"
+  carrier_attribute {
+    mccmnc_tuple: "502159"
+    spn: "DNB 5G"
+  }
+}
+carrier_id {
+  canonical_id: 2711
+  carrier_name: "eSIM Go Travel"
+  carrier_attribute {
+    mccmnc_tuple: "27225"
+    gid1: "0409"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "23457"
+    gid1: "0409"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "20628"
+    gid1: "0409"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "23210"
+    gid1: "0409"
   }
 }
 carrier_id {
@@ -13178,4 +13267,4 @@ carrier_id {
   }
   parent_canonical_id: 1779
 }
-version: 117440560
+version: 117440561

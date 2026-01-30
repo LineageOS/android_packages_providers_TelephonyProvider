@@ -45,6 +45,7 @@ import android.util.SparseArray;
 
 import com.android.compatibility.common.util.ShellIdentityUtils;
 import com.android.internal.telephony.PhoneFactory;
+import com.android.internal.telephony.flags.Flags;
 
 import libcore.io.IoUtils;
 
@@ -160,11 +161,10 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
 
         mCursors = new HashMap<Uri, FakeCursor>();
         /* Bind tables to the cursors */
-        mSmsCursor = new FakeCursor(mSmsTable, TelephonyBackupAgent.SMS_PROJECTION);
+        mSmsCursor = new FakeCursor(mSmsTable, TelephonyBackupAgent.getSmsProjection());
         mCursors.put(Telephony.Sms.CONTENT_URI, mSmsCursor);
-        mMmsCursor = new FakeCursor(mMmsTable, TelephonyBackupAgent.MMS_PROJECTION);
+        mMmsCursor = new FakeCursor(mMmsTable, TelephonyBackupAgent.getMmsProjection());
         mCursors.put(Telephony.Mms.CONTENT_URI, mMmsCursor);
-
 
         /* Generating test data */
         mSmsRows = new ContentValues[4];
@@ -176,7 +176,7 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 "\"+1232132214124\",\"body\":\"sms 1\",\"subject\":\"sms subject\",\"date\":" +
                 "\"9087978987\",\"date_sent\":\"999999999\",\"status\":\"3\",\"type\":\"44\"," +
                 "\"recipients\":[\"+123 (213) 2214124\"],\"archived\":true,\"read\":\"0\"," +
-                "\"restricted\":\"0\",\"tr_id\":\"tr_id\"}";
+                "\"tr_id\":\"tr_id\"" + serializeRestrictedField(false) + "}";
         mThreadProvider.setArchived(
                 mThreadProvider.getOrCreateThreadId(new String[]{"+123 (213) 2214124"}));
 
@@ -184,8 +184,8 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 0, 4, 1, true, /* isReadRestricted= */ false, /*transactionId*/"tr_id");
         mSmsJson[1] = "{\"address\":\"+1232132214124\",\"body\":\"sms 2\",\"date\":" +
                 "\"9087978987\",\"date_sent\":\"999999999\",\"status\":\"0\",\"type\":\"4\"," +
-                "\"recipients\":[\"+123 (213) 2214124\"],\"read\":\"1\",\"restricted\":\"0\"," +
-                "\"tr_id\":\"tr_id\"}";
+                "\"recipients\":[\"+123 (213) 2214124\"],\"read\":\"1\",\"tr_id\":\"tr_id\"" +
+                serializeRestrictedField(false) + "}";
 
         mSmsRows[2] = createSmsRow(4, 3, "+1232221412433 +1232221412444", "sms 3", null,
                 111111111111l, 999999999, 2, 3, 2, false, /* isReadRestricted= */ false,
@@ -195,7 +195,7 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 "\"date_sent\":" +
                 "\"999999999\",\"status\":\"2\",\"type\":\"3\"," +
                 "\"recipients\":[\"+1232221412433\",\"+1232221412444\"],\"read\":\"0\"," +
-                "\"restricted\":\"0\",\"tr_id\":\"tr_id\"}";
+                "\"tr_id\":\"tr_id\"" + serializeRestrictedField(false) + "}";
         mThreadProvider.getOrCreateThreadId(new String[]{"+1232221412433", "+1232221412444"});
 
 
@@ -206,7 +206,7 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 "\"body\":\"sms 4\",\"date\":\"111111111111\"," +
                 "\"date_sent\":" +
                 "\"999999999\",\"status\":\"2\",\"type\":\"3\",\"read\":\"0\"," +
-                "\"restricted\":\"1\",\"tr_id\":\"tr_id\"}";
+                "\"tr_id\":\"tr_id\"" + serializeRestrictedField(true) + "}";
 
         mAllSmsJson = makeJsonArray(mSmsJson);
 
@@ -226,8 +226,8 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 "\"date\":\"111111\",\"date_sent\":\"111112\",\"m_type\":\"3\",\"v\":\"17\"," +
                 "\"msg_box\":\"11\",\"ct_l\":\"location 1\"," +
                 "\"recipients\":[\"+11121212\",\"example@example.com\",\"+999999999\"]," +
-                "\"read\":\"0\"," +
-                "\"restricted\":\"0\"," +
+                "\"read\":\"0\"" +
+                serializeRestrictedField(false) + "," +
                 "\"mms_addresses\":" +
                 "[{\"type\":10,\"address\":\"+111 (111) 11111111\",\"charset\":100}," +
                 "{\"type\":11,\"address\":\"+11121212\",\"charset\":101},{\"type\":12,\"address\":"+
@@ -247,8 +247,8 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         mMmsJson[1] = "{\"date\":\"111122\",\"date_sent\":\"1111112\",\"m_type\":\"4\"," +
                 "\"v\":\"18\",\"msg_box\":\"222\",\"ct_l\":\"location 2\"," +
                 "\"recipients\":[\"example@example.com\",\"+999999999\"]," +
-                "\"read\":\"1\"," +
-                "\"restricted\":\"0\"," +
+                "\"read\":\"1\"" +
+                serializeRestrictedField(false) + "," +
                 "\"mms_addresses\":" +
                 "[{\"type\":10,\"address\":\"+7 (333) \",\"charset\":100}," +
                 "{\"type\":11,\"address\":\"example@example.com\",\"charset\":101}," +
@@ -269,8 +269,8 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 "\"date\":\"111133\",\"date_sent\":\"1111132\",\"m_type\":\"5\",\"v\":\"19\"," +
                 "\"msg_box\":\"333\"," +
                 "\"recipients\":[\"+123 (213) 2214124\"],\"archived\":true," +
-                "\"read\":\"0\"," +
-                "\"restricted\":\"1\"," +
+                "\"read\":\"0\"" +
+                serializeRestrictedField(true) + "," +
                 "\"mms_addresses\":" +
                 "[{\"type\":10,\"address\":\"333 333333333333\",\"charset\":100}," +
                 "{\"type\":11,\"address\":\"+1232132214124\",\"charset\":101}]," +
@@ -300,8 +300,8 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 "\"date\":\"111111\",\"date_sent\":\"111112\",\"m_type\":\"3\",\"v\":\"17\"," +
                 "\"msg_box\":\"11\",\"ct_l\":\"location 1\"," +
                 "\"recipients\":[\"+11121212\",\"example@example.com\",\"+999999999\"]," +
-                "\"read\":\"0\"," +
-                "\"restricted\":\"0\"," +
+                "\"read\":\"0\"" +
+                serializeRestrictedField(false) + "," +
                 "\"mms_addresses\":" +
                 "[{\"type\":10,\"address\":\"+111 (111) 11111111\",\"charset\":100}," +
                 "{\"type\":11,\"address\":\"+11121212\",\"charset\":101},{\"type\":12,\"address\":"+
@@ -324,7 +324,9 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
                 "\"sub\":\"Subject 1\",\"date\":\"111111\",\"date_sent\":\"111112\",\"m_type\":" +
                 "\"3\",\"v\":\"17\",\"msg_box\":\"11\",\"ct_l\":\"location 1\"," +
                 "\"recipients\":[\"+11121212\",\"example@example.com\",\"+999999999\"]," +
-                "\"read\":\"0\",\"restricted\":\"0\",\"mms_addresses\":[],\"mms_charset\":111," +
+                "\"read\":\"0\"" +
+                serializeRestrictedField(false) + "," +
+                "\"mms_addresses\":[],\"mms_charset\":111," +
                 "\"sub_cs\":\"100\"}"});
 
 
@@ -372,6 +374,13 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         mTelephonyBackupAgent.setBackupManager(mockBackupManager);
     }
 
+    private String serializeRestrictedField(boolean isReadRestricted) {
+      if(Flags.secureAccessToRestrictedRcsMessages()) {
+        return ",\"restricted\":\"" + (isReadRestricted ? "1" : "0") + "\"";
+      }
+      return "";
+    }
+
     @Override
     protected void tearDown() throws Exception {
         mTelephonyBackupAgent.clearSharedPreferences();
@@ -415,7 +424,9 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         smsRow.put(Telephony.Sms.TYPE, String.valueOf(type));
         smsRow.put(Telephony.Sms.THREAD_ID, threadId);
         smsRow.put(Telephony.Sms.READ, read ? "1" : "0");
-        smsRow.put(Telephony.ReadRestriction.RESTRICTED, isReadRestricted ? "1" : "0");
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            smsRow.put(Telephony.ReadRestriction.RESTRICTED, isReadRestricted ? "1" : "0");
+        }
         smsRow.put(Telephony.Sms.TRANSACTION_ID, transactionId);
 
         return smsRow;
@@ -448,7 +459,9 @@ public class TelephonyBackupAgentTest extends AndroidTestCase {
         }
         mmsRow.put(Telephony.Mms.THREAD_ID, threadId);
         mmsRow.put(Telephony.Mms.READ, read ? "1" : "0");
-        mmsRow.put(Telephony.ReadRestriction.RESTRICTED, isReadRestricted ? "1" : "0");
+        if (Flags.secureAccessToRestrictedRcsMessages()) {
+            mmsRow.put(Telephony.ReadRestriction.RESTRICTED, isReadRestricted ? "1" : "0");
+        }
 
         final Uri partUri = Telephony.Mms.CONTENT_URI.buildUpon().appendPath(String.valueOf(id)).
                 appendPath("part").build();

@@ -55,6 +55,7 @@ import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.PhoneFactory;
+import com.android.internal.telephony.flags.Flags;
 
 import com.google.android.mms.ContentType;
 import com.google.android.mms.pdu.CharacterSets;
@@ -76,6 +77,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
@@ -203,8 +205,7 @@ public class TelephonyBackupAgent extends BackupAgent {
     private long mUnknownSenderThreadId;
 
     // Columns from SMS database for backup/restore.
-    @VisibleForTesting
-    static final String[] SMS_PROJECTION = new String[] {
+    private static final String[] SMS_PROJECTION = new String[] {
             Telephony.Sms._ID,
             Telephony.Sms.SUBSCRIPTION_ID,
             Telephony.Sms.ADDRESS,
@@ -216,9 +217,17 @@ public class TelephonyBackupAgent extends BackupAgent {
             Telephony.Sms.TYPE,
             Telephony.Sms.THREAD_ID,
             Telephony.Sms.READ,
-            Telephony.ReadRestriction.RESTRICTED,
             Telephony.Sms.TRANSACTION_ID,
     };
+
+    // Columns from SMS database for backup/restore. This projection should be used when
+    // {@code Flags.secureAccessToRestrictedRcsMessages()} is enabled.
+    // TODO: b/459576374 - Remove this projection and add RESTRICTED column to the SMS_PROJECTION
+    // once the flag is fully rolled out.
+    private static final String[] SMS_PROJECTION_WITH_RESTRICTED = Stream.concat(
+            Arrays.stream(SMS_PROJECTION),
+            Stream.of(Telephony.ReadRestriction.RESTRICTED)
+    ).toArray(String[]::new);
 
     // Columns to fetch recepients of SMS.
     private static final String[] SMS_RECIPIENTS_PROJECTION = {
@@ -227,8 +236,7 @@ public class TelephonyBackupAgent extends BackupAgent {
     };
 
     // Columns from MMS database for backup/restore.
-    @VisibleForTesting
-    static final String[] MMS_PROJECTION = new String[] {
+    private static final String[] MMS_PROJECTION = new String[] {
             Telephony.Mms._ID,
             Telephony.Mms.SUBSCRIPTION_ID,
             Telephony.Mms.SUBJECT,
@@ -242,8 +250,16 @@ public class TelephonyBackupAgent extends BackupAgent {
             Telephony.Mms.THREAD_ID,
             Telephony.Mms.TRANSACTION_ID,
             Telephony.Mms.READ,
-            Telephony.ReadRestriction.RESTRICTED
     };
+
+    // Columns from MMS database for backup/restore. This projection should be used when
+    // {@code Flags.secureAccessToRestrictedRcsMessages()} is enabled.
+    // TODO: b/459576374 -  Remove this projection and add RESTRICTED column to the MMS_PROJECTION
+    // once the flag is fully rolled out.
+    private static final String[] MMS_PROJECTION_WITH_RESTRICTED = Stream.concat(
+            Arrays.stream(MMS_PROJECTION),
+            Stream.of(Telephony.ReadRestriction.RESTRICTED)
+    ).toArray(String[]::new);
 
     // Columns from addr database for backup/restore. This database is used for fetching addresses
     // for MMS message.
@@ -464,10 +480,10 @@ public class TelephonyBackupAgent extends BackupAgent {
         }
 
         try (
-                Cursor smsCursor = mContentResolver.query(Telephony.Sms.CONTENT_URI, SMS_PROJECTION,
-                        null, null, ORDER_BY_DATE);
-                Cursor mmsCursor = mContentResolver.query(Telephony.Mms.CONTENT_URI, MMS_PROJECTION,
-                        null, null, ORDER_BY_DATE)) {
+            Cursor smsCursor = mContentResolver.query(Telephony.Sms.CONTENT_URI,
+                        getSmsProjection(), null, null, ORDER_BY_DATE);
+            Cursor mmsCursor = mContentResolver.query(Telephony.Mms.CONTENT_URI,
+                        getMmsProjection(), null, null, ORDER_BY_DATE)) {
 
             if (smsCursor != null) {
                 smsCursor.moveToFirst();
@@ -506,6 +522,18 @@ public class TelephonyBackupAgent extends BackupAgent {
         }
 
         mThreadArchived = new HashMap<>();
+    }
+
+    @VisibleForTesting
+    static String[] getSmsProjection() {
+        return Flags.secureAccessToRestrictedRcsMessages()
+                ? SMS_PROJECTION_WITH_RESTRICTED : SMS_PROJECTION;
+    }
+
+    @VisibleForTesting
+    static String[] getMmsProjection() {
+        return Flags.secureAccessToRestrictedRcsMessages()
+                ? MMS_PROJECTION_WITH_RESTRICTED : MMS_PROJECTION;
     }
 
     @VisibleForTesting

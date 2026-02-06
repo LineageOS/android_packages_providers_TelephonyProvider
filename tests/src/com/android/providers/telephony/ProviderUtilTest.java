@@ -25,8 +25,6 @@ import static org.mockito.Mockito.when;
 
 import android.app.AppOpsManager;
 import android.content.Context;
-import android.content.RestrictionEntry;
-import android.content.RestrictionsManager;
 import android.os.UserHandle;
 import android.os.Process;
 import android.platform.test.annotations.DisableFlags;
@@ -63,13 +61,10 @@ public class ProviderUtilTest {
     private TelephonyManager mTelephonyManager;
     @Mock
     private AppOpsManager mAppOpsManager;
-    @Mock
-    private RestrictionsManager mRestrictionsManager;
 
     private Map<Integer, List<EmergencyNumber>> mEmergencyNumberList;
 
     private static final String EXAMPLE_PACKAGE_NAME = "com.example.app";
-    private static final String EXAMPLE_ARCHIVAL_PACKAGE_NAME = "com.example.archival.app";
     private static final int EXAMPLE_PACKAGE_UID = 21001;
 
     @Before
@@ -80,9 +75,6 @@ public class ProviderUtilTest {
         when(mContext.getSystemService(SubscriptionManager.class)).thenReturn(mSubscriptionManager);
         when(mContext.getSystemService(TelephonyManager.class)).thenReturn(mTelephonyManager);
         when(mContext.getSystemService(Context.APP_OPS_SERVICE)).thenReturn(mAppOpsManager);
-        when(mContext.getSystemService(Context.RESTRICTIONS_SERVICE)).thenReturn(
-                mRestrictionsManager);
-        when(mRestrictionsManager.getManifestRestrictions(anyString())).thenReturn(null);
     }
 
     @After
@@ -203,22 +195,6 @@ public class ProviderUtilTest {
     @Test
     @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
     public void canReadRestrictedMessages_packageNoAppOpGranted_returnsFalse() {
-        when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_READ_RESTRICTED_MESSAGES,
-                EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
-                    AppOpsManager.MODE_IGNORED);
-
-        assertThat(ProviderUtil.canReadRestrictedMessages(mContext, EXAMPLE_PACKAGE_NAME,
-                EXAMPLE_PACKAGE_UID)).isFalse();
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
-    public void canReadRestrictedMessages_appOpNotGranted_differentArchivalApp_returnsFalse() {
-        when(mRestrictionsManager.getManifestRestrictions(EXAMPLE_PACKAGE_NAME))
-                .thenReturn(
-                List.of(
-                        new RestrictionEntry("messages_archival", "com.example.different.app")
-                ));
         when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_READ_RESTRICTED_MESSAGES,
                 EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
                     AppOpsManager.MODE_IGNORED);

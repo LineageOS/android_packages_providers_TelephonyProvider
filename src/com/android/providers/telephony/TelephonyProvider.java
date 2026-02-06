@@ -5783,13 +5783,13 @@ public class TelephonyProvider extends ContentProvider
                 Context.MODE_PRIVATE);
         SharedPreferences.Editor editorApnId = spApnId.edit();
         editorApnId.clear();
-        editorApnId.apply();
+        editorApnId.commit();
 
         SharedPreferences spApn = getContext().getSharedPreferences(PREF_FILE_FULL_APN,
                 Context.MODE_PRIVATE);
         SharedPreferences.Editor editorApn = spApn.edit();
         editorApn.clear();
-        editorApn.apply();
+        editorApn.commit();
 
         if (apnSourceServiceExists(getContext())) {
             restoreApnsWithService(subId);

@@ -31,7 +31,6 @@ import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Telephony;
 import android.provider.Telephony.ReadRestriction;
 import android.provider.Telephony.ReadRestriction.ReadRestrictionValues;
-import android.telephony.MessageUpgradeController;
 import androidx.test.core.app.ApplicationProvider;
 
 import com.android.internal.telephony.flags.Flags;
@@ -52,17 +51,18 @@ public class ReadRestrictionTest {
     @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private Context mContext = ApplicationProvider.getApplicationContext();
-    private MessageUpgradeController mMessageUpgradeController
-         = new MessageUpgradeController(mContext);
 
     @Test
-    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    @EnableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
     public void setReadRestrictionValueOnInsert_restrictedSet_verifyRestrictedValueIsReplaced() {
         ContentValues values = createExampleContentValues();
         values.put(ReadRestriction.RESTRICTED, true);
 
-        ReadRestriction.setReadRestrictionValueOnInsert(values, mMessageUpgradeController,
-            TEST_PACKAGE_NAME, /* canWriteRestrictedMessages= */ true);
+        ReadRestriction.setReadRestrictionValueOnInsert(mContext, values, TEST_PACKAGE_NAME,
+            /* canWriteRestrictedMessages= */ true);
 
         assertThat(values.getAsInteger(ReadRestriction.READ_RESTRICTION_COLUMN_NAME))
             .isEqualTo(ReadRestrictionValues.READ_RESTRICTION_RESTRICTED);
@@ -70,51 +70,64 @@ public class ReadRestrictionTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    @DisableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
     public void setReadRestrictionValueOnInsert_restrictedSet_flagDisabled_noop() {
         ContentValues values = createExampleContentValues();
         values.put(ReadRestriction.RESTRICTED, true);
 
-        ReadRestriction.setReadRestrictionValueOnInsert(values,
-            mMessageUpgradeController, TEST_PACKAGE_NAME, /* canWriteRestrictedMessages= */ true);
+        ReadRestriction.setReadRestrictionValueOnInsert(mContext, values, TEST_PACKAGE_NAME,
+            /* canWriteRestrictedMessages= */ true);
 
         assertThat(values.getAsBoolean(ReadRestriction.RESTRICTED)).isTrue();
         assertThat(values.containsKey(ReadRestriction.READ_RESTRICTION_COLUMN_NAME)).isFalse();
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
-    public void setReadRestrictionValueOnInsert_restrictedEmpty_verifyRestrictedValueIsZero() {
+    @EnableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
+    public void setReadRestrictionValueOnInsert_restrictedNotSet_readRestrictionIsRestricted() {
         ContentValues values = createExampleContentValues();
 
-        ReadRestriction.setReadRestrictionValueOnInsert(values,
-            mMessageUpgradeController, TEST_PACKAGE_NAME, /* canWriteRestrictedMessages= */ true);
+        ReadRestriction.setReadRestrictionValueOnInsert(mContext, values, TEST_PACKAGE_NAME,
+            /* canWriteRestrictedMessages= */ true);
 
-        assertThat(values.getAsInteger(ReadRestriction.READ_RESTRICTION_COLUMN_NAME)).isEqualTo(0);
+        assertThat(values.getAsInteger(ReadRestriction.READ_RESTRICTION_COLUMN_NAME))
+            .isEqualTo(ReadRestrictionValues.READ_RESTRICTION_RESTRICTED);
         assertThat(values.containsKey(ReadRestriction.RESTRICTED)).isFalse();
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    @EnableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
     public void setReadRestrictionValueOnInsert_cannotWriteRestrictedMessages_throwsException() {
         ContentValues values = createExampleContentValues();
         values.put(ReadRestriction.RESTRICTED, true);
 
         assertThrows(UnsupportedOperationException.class, () -> {
-            ReadRestriction.setReadRestrictionValueOnInsert(values, mMessageUpgradeController,
-                TEST_PACKAGE_NAME, /* canWriteRestrictedMessages= */ false);
+            ReadRestriction.setReadRestrictionValueOnInsert(mContext, values, TEST_PACKAGE_NAME,
+                /* canWriteRestrictedMessages= */ false);
         });
 
         values.put(ReadRestriction.RESTRICTED, false);
 
         assertThrows(UnsupportedOperationException.class, () -> {
-            ReadRestriction.setReadRestrictionValueOnInsert(values, mMessageUpgradeController,
-                TEST_PACKAGE_NAME, /* canWriteRestrictedMessages= */ false);
+            ReadRestriction.setReadRestrictionValueOnInsert(mContext, values, TEST_PACKAGE_NAME,
+                /* canWriteRestrictedMessages= */ false);
         });
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    @EnableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
     public void setReadRestrictionValueOnUpdate_restrictedFalse_setsReadRestrictionToZero() {
         ContentValues values = createExampleContentValues();
         values.put(ReadRestriction.RESTRICTED, false);
@@ -127,7 +140,10 @@ public class ReadRestrictionTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    @EnableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
     public void setReadRestrictionValueOnUpdate_cannotWriteRestrictedMessages_throwsException() {
         ContentValues values = createExampleContentValues();
         values.put(ReadRestriction.RESTRICTED, false);
@@ -138,7 +154,10 @@ public class ReadRestrictionTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    @EnableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
     public void setReadRestrictionValueOnUpdate_restrictedTrue_throwsException() {
         ContentValues values = createExampleContentValues();
         values.put(ReadRestriction.RESTRICTED, true);
@@ -149,7 +168,10 @@ public class ReadRestrictionTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    @DisableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
     public void setReadRestrictionValueOnUpdate_flagDisabled_noop() {
         ContentValues values = createExampleContentValues();
         values.put(ReadRestriction.RESTRICTED, true);

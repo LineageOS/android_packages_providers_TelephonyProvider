@@ -58,27 +58,24 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
-import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.database.sqlite.SQLiteQueryBuilder;
 import android.util.Log;
-import android.util.Xml;
+
+import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.telephony.HbpcdLookup.ArbitraryMccSidMatch;
+import com.android.internal.telephony.HbpcdLookup.MccIdd;
+import com.android.internal.telephony.HbpcdLookup.MccLookup;
+import com.android.internal.telephony.HbpcdLookup.MccSidConflicts;
+import com.android.internal.telephony.HbpcdLookup.MccSidRange;
+import com.android.internal.telephony.HbpcdLookup.NanpAreaCode;
+import com.android.internal.util.XmlUtils;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.IOException;
-
-import com.android.internal.telephony.HbpcdLookup;
-import com.android.internal.telephony.HbpcdLookup.MccIdd;
-import com.android.internal.telephony.HbpcdLookup.MccLookup;
-import com.android.internal.telephony.HbpcdLookup.MccSidConflicts;
-import com.android.internal.telephony.HbpcdLookup.MccSidRange;
-import com.android.internal.telephony.HbpcdLookup.ArbitraryMccSidMatch;
-import com.android.internal.telephony.HbpcdLookup.NanpAreaCode;
-import com.android.internal.util.XmlUtils;
 
 public class HbpcdLookupDatabaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "HbpcdLockupDatabaseHelper";
@@ -97,7 +94,17 @@ public class HbpcdLookupDatabaseHelper extends SQLiteOpenHelper {
      * @param context of the user.
      */
     public HbpcdLookupDatabaseHelper(Context context) {
-        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        this(context, DATABASE_NAME);
+    }
+
+    /**
+     * DatabaseHelper helper class for loading HBPCD data into a database.
+     *
+     * @param context of the user.
+     * @param name of the database.
+     */
+    public HbpcdLookupDatabaseHelper(Context context, String name) {
+        super(context, name, null, DATABASE_VERSION);
 
         mContext = context;
         // Memory optimization - close idle connections after 30s of inactivity
@@ -154,7 +161,8 @@ public class HbpcdLookupDatabaseHelper extends SQLiteOpenHelper {
         // do nothing
     }
 
-    private void initDatabase (SQLiteDatabase db) {
+    @VisibleForTesting
+    void initDatabase(SQLiteDatabase db) {
         // Read internal data from xml
         Resources r = mContext.getResources();
         XmlResourceParser parser = r.getXml(R.xml.hbpcd_lookup_tables);

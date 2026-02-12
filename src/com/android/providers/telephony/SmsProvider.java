@@ -76,7 +76,6 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 public class SmsProvider extends ContentProvider {
     /* No response constant from SmsResponse */
@@ -207,23 +206,6 @@ public class SmsProvider extends ContentProvider {
     private final Executor mBackgroundExecutor = Executors.newSingleThreadExecutor();
 
     private final Handler mMainThreadHandler = new Handler(Looper.getMainLooper());
-
-    // TODO: jferec - Remove this once the MessageUpgradeController is a singleton.
-    // Lazy initialization for testing setup that omits #onCreate() invocation.
-    private final Supplier<MessageUpgradeController> mMessageUpgradeControllerSupplier =
-        new Supplier<MessageUpgradeController>() {
-            private MessageUpgradeController mMessageUpgradeController = null;
-
-            @Override
-            public MessageUpgradeController get() {
-                synchronized (this) {
-                    if (mMessageUpgradeController == null) {
-                        mMessageUpgradeController = new MessageUpgradeController(getContext());
-                    }
-                    return mMessageUpgradeController;
-                }
-            }
-        };
 
     @VisibleForTesting
     protected TextClassifier mTextClassifier;
@@ -1072,8 +1054,8 @@ public class SmsProvider extends ContentProvider {
             if (Flags.secureAccessToRestrictedRcsMessages()) {
                 final boolean canWriteRestrictedMessages = ProviderUtil.canWriteRestrictedMessages(
                         getContext(), callerPkg, callerUid);
-                ReadRestriction.setReadRestrictionValueOnInsert(values,
-                    mMessageUpgradeControllerSupplier.get(), callerPkg, canWriteRestrictedMessages);
+                ReadRestriction.setReadRestrictionValueOnInsert(getContext(), values, callerPkg,
+                        canWriteRestrictedMessages);
             }
 
             // thread_id

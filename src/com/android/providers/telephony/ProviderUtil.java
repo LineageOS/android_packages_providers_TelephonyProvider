@@ -18,17 +18,22 @@ package com.android.providers.telephony;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.AppOpsManager;
+import android.app.compat.CompatChanges;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.verify.domain.DomainVerificationInfo;
+import android.content.pm.verify.domain.DomainVerificationManager;
 import android.net.Uri;
 import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Telephony;
+import android.telephony.SmsManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
@@ -36,6 +41,7 @@ import android.telephony.emergency.EmergencyNumber;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.android.internal.telephony.PackageBasedTokenUtil;
 import com.android.internal.telephony.SmsApplication;
 import com.android.internal.telephony.TelephonyPermissions;
 import com.android.internal.telephony.flags.Flags;
@@ -44,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +59,16 @@ import java.util.stream.Collectors;
 public class ProviderUtil {
     private final static String TAG = "SmsProvider";
     private static final String TELEPHONY_PROVIDER_PACKAGE = "com.android.providers.telephony";
+
+    /** A possible OTP message should only remain in its "pending otp classification" state for
+     * up to 5 seconds
+     */
+    private static final long OTP_CLASSIFICATION_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
+
+    /** OTP messages should be redacted for 3 hours */
+    public static final long OTP_HIDING_TIME_MS = TimeUnit.HOURS.toMillis(3);
+
+    private static final int MAX_ALLOWED_VERIFIED_DOMAINS = 5;
 
     /**
      * Check if a caller of the provider has restricted access,
@@ -83,6 +100,19 @@ public class ProviderUtil {
         int op = ((AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE)).noteOpNoThrow(
                 AppOpsManager.OP_READ_RESTRICTED_MESSAGES, uid, packageName, null, null);
         return op == AppOpsManager.MODE_ALLOWED;
+    }
+
+    /**
+     * Check if a caller of the provider can read OTP messages.
+     *
+     * @param context the context to use
+     * @param uid the caller uid
+     * @param packageName the caller package name
+     * @return true if the caller is trusted for SMS OTP, false otherwise
+     */
+    @SuppressLint("MissingPermission")
+    public static boolean canReadOtpSms(Context context, int uid, String packageName) {
+        return SmsManager.isAppTrustedForSmsOtp(context, packageName, uid);
     }
 
     /**
@@ -344,5 +374,127 @@ public class ProviderUtil {
             }
         }
         Log.d(TAG, "RunningTelephonyProviderProcesses:" + sb.toString());
+    }
+
+    /**
+     * Returns a SQL WHERE clause to filter out OTP messages for unauthorized callers.
+     *
+     * @param context the context to use
+     * @param callingPackage the caller package name
+     * @param userHandle the caller user handle
+     * @return the SQL WHERE clause
+     */
+    @SuppressLint("MissingPermission")
+    public static String getOtpWhereFilter(Context context, String callingPackage,
+            UserHandle userHandle) {
+        // If this app can't read OTP messages, only return messages without OTPs, or
+        // messages more than the threshold old, or messages still pending classification,
+        // past the classification cutoff time.
+        long startOfCurrentMinuteInMs = (System.currentTimeMillis() / 60000) * 60000;
+        long otpCutoff = startOfCurrentMinuteInMs - OTP_HIDING_TIME_MS;
+        long startOfCurrentSecondInMs = (System.currentTimeMillis() / 1000) * 1000;
+        long pendingOtpCutoff = startOfCurrentSecondInMs - OTP_CLASSIFICATION_TIMEOUT_MS;
+        final StringBuilder where = new StringBuilder("(");
+        where.append(String.format(
+                " %s OR %s < %d OR (%s AND %s < %d)",
+                getContainsOtpSqlFilter(Telephony.Sms.OTP_TYPE_NONE), Telephony.Sms.DATE, otpCutoff,
+                getOtpPendingSqlFilter(), Telephony.Sms.DATE, pendingOtpCutoff));
+        final String hash = PackageBasedTokenUtil.generatePackageBasedToken(
+                context.getPackageManager(), callingPackage, userHandle);
+        if (hash != null) {
+            where.append(String.format(" OR (%s LIKE '%%%s%%')",
+                    Telephony.Sms.BODY, hash));
+        }
+        // Note: For backwards compatibility, we allow packages with
+        // targetSdk < CINNAMON_BUN to read generic OTP messages.
+        if (android.view.flags.Flags.redactOtpAppCompatApi()
+                && !CompatChanges.isChangeEnabled(SmsManager.FILTER_GENERIC_OTP,
+                callingPackage, userHandle)) {
+            where.append(String.format(" OR %s", getContainsGenericOtpSqlFilter()));
+        }
+        // Note: For backwards compatibility, we allow read access to verified owners of
+        // the domain found in Web OTPs.
+        if (android.view.flags.Flags.redactWebOtpSmsApi()) {
+            where.append(getVerifiedDomainSql(context, callingPackage));
+        }
+        where.append(")");
+        return where.toString();
+    }
+
+    private static String getContainsOtpSqlFilter(int containsOtpType) {
+        if (android.view.flags.Flags.redactOtpAppCompatApi()) {
+            return String.format("((%s & %d) = %d)",
+                    Telephony.Sms.CONTAINS_OTP, Telephony.Sms.OTP_TYPE_MASK, containsOtpType);
+        }
+        return String.format("(%s = %d)", Telephony.Sms.CONTAINS_OTP, containsOtpType);
+    }
+
+    private static String getOtpPendingSqlFilter() {
+        return getContainsOtpSqlFilter(Telephony.Sms.OTP_TYPE_PENDING);
+    }
+
+    private static String getContainsGenericOtpSqlFilter() {
+        // Generic OTP is an OTP that does not follow standards defined by either
+        // SMS Hash Retriever standards or Web OTP standards.
+        return String.format("((%s & %s) = %s)",
+                Telephony.Sms.CONTAINS_OTP,
+                Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
+                Telephony.Sms.OTP_SUBTYPE_NONE | Telephony.Sms.OTP_TYPE_CONTAINS_OTP);
+    }
+
+    // Returns SQL string to be appended to the where clause of the main query which will match
+    // Web OTP rows containing a verified domain owned by `callingPackageName`.
+    // Returns an empty string if the package has no verified domains, or if an exception is
+    // encountered.
+    @SuppressLint("MissingPermission")
+    private static String getVerifiedDomainSql(Context context, String callingPackageName) {
+        try {
+            DomainVerificationManager domainVerificationManager =
+                    context.getSystemService(DomainVerificationManager.class);
+            DomainVerificationInfo domainVerificationInfo =
+                    domainVerificationManager.getDomainVerificationInfo(callingPackageName);
+            if (domainVerificationInfo != null
+                    && !domainVerificationInfo.getHostToStateMap().isEmpty()) {
+                StringBuilder verifiedDomainSql = new StringBuilder();
+                for (Map.Entry<String, Integer> hostToVerificationState :
+                        domainVerificationInfo.getHostToStateMap().entrySet()) {
+                    String domain = hostToVerificationState.getKey();
+                    Integer verificationState = hostToVerificationState.getValue();
+                    boolean isDomainVerified =
+                            verificationState == DomainVerificationInfo.STATE_MODIFIABLE_VERIFIED
+                                    || verificationState == DomainVerificationInfo.STATE_SUCCESS;
+                    // To avoid performance issue and potential abuse, we currently set a hard-limit
+                    // to the number of verified domains allowed.
+                    if (isDomainVerified && verifiedDomainSql.length()
+                            < MAX_ALLOWED_VERIFIED_DOMAINS) {
+                        // Match a "@<domain> #" substring.
+                        String containsDomainSql = String.format(
+                                "(%s LIKE '%%@%s #%%')", Telephony.Sms.BODY, domain);
+                        if (verifiedDomainSql.length() != 0) {
+                            verifiedDomainSql.append(" OR ");
+                        }
+                        verifiedDomainSql.append(containsDomainSql);
+                    }
+                }
+                if (verifiedDomainSql.length() != 0) {
+                    // Roughly translates to the following query:
+                    // "OR ((contains_otp & 0xFFFF) = <bitmask for WEB OTP>"
+                    // "AND (body LIKE '%@<domain1> #%' OR body LIKE '%@<domain2> #%' OR ...)"
+                    return String.format(" OR ((%s & %s) = %s AND (%s))",
+                            Telephony.Sms.CONTAINS_OTP,
+                            Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
+                            android.view.flags.Flags.redactOtpAppCompatApi()
+                                    ? Telephony.Sms.OTP_SUBTYPE_WEB_OTP
+                                    | Telephony.Sms.OTP_TYPE_CONTAINS_OTP
+                                    : Telephony.Sms.OTP_TYPE_CONTAINS_OTP,
+                            verifiedDomainSql.toString());
+                }
+                return "";
+            }
+            return "";
+        } catch (Exception e) {
+            // In case of exceptions, fail gracefully.
+            return "";
+        }
     }
 }

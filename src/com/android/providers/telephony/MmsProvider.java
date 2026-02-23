@@ -46,11 +46,11 @@ import android.provider.Telephony.Mms.Addr;
 import android.provider.Telephony.Mms.Part;
 import android.provider.Telephony.Mms.Rate;
 import android.provider.Telephony.MmsSms;
-import android.provider.Telephony.Threads;
 import android.provider.Telephony.ReadRestriction;
-import android.provider.Telephony.ReadRestriction.ReadRestrictionValues;
+import android.provider.Telephony.Threads;
 import android.system.ErrnoException;
 import android.system.Os;
+import android.telephony.MessageUpgradeController;
 import android.telephony.SmsManager;
 import android.telephony.SubscriptionManager;
 import android.text.TextUtils;
@@ -1319,6 +1319,12 @@ public class MmsProvider extends ContentProvider {
         }
         int count = db.update(table, finalValues, finalSelection, selectionArgs);
         if (notify && (count > 0)) {
+            // If this message was upgraded, evaluate its new status and dispatch
+            // any associated PendingIntents to notify the sender.
+            // TODO(b/487924740) Optimize to avoid controller overhead during bulk writes
+            final Context context = getContext();
+            MessageUpgradeController.dispatchMmsPendingIntentsIfUpgraded(
+                    context, context.getUserId(), uri, finalValues);
             notifyChange(uri, null);
         }
         return count;

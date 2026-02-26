@@ -1341,6 +1341,9 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
          * because messages are considered to be part of the same
          * thread if they have the same subject (or a null subject)
          * and the same set of recipients.
+         *
+         * NOTE: Whenever the columns here are changed, the columns in
+         * {@link MmsSmsProvider#getOtpRedactedThreadsTable} must be changed to match.
          */
         db.execSQL("CREATE TABLE threads (" +
                    Threads._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +

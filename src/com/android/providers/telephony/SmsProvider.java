@@ -50,9 +50,8 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Contacts;
 import android.provider.Telephony;
-import android.provider.Telephony.ReadRestriction;
-import android.provider.Telephony.ReadRestriction.ReadRestrictionValues;
 import android.provider.Telephony.MmsSms;
+import android.provider.Telephony.ReadRestriction;
 import android.provider.Telephony.Sms;
 import android.provider.Telephony.Threads;
 import android.telephony.MessageUpgradeController;
@@ -1806,6 +1805,13 @@ public class SmsProvider extends ContentProvider {
             if (Log.isLoggable(TAG, Log.VERBOSE)) {
                 Log.d(TAG, "update " + url + " succeeded");
             }
+
+            // If this message was upgraded, evaluate its new status and dispatch
+            // any associated PendingIntents to notify the sender.
+            // TODO(b/487924740) Optimize to avoid controller overhead during bulk writes
+            final Context context = getContext();
+            MessageUpgradeController.dispatchSmsPendingIntentsIfUpgraded(
+                    context, context.getUserId(), url, values);
             notifyChange(notifyIfNotDefault, url, callerPkg);
         }
         return count;

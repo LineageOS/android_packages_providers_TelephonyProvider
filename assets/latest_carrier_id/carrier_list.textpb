@@ -13213,4 +13213,11 @@ carrier_id {
   }
   parent_canonical_id: 1690
 }
-version: 134217777
+carrier_id {
+  canonical_id: 10042
+  carrier_name: "China Broadnet"
+  carrier_attribute {
+    mccmnc_tuple: "46015"
+  }
+}
+version: 134217778

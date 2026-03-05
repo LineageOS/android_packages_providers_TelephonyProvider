@@ -210,9 +210,10 @@ public class MmsSmsProvider extends ContentProvider {
     private static String getTextSearchQuery(String smsTable, String pduTable,
             boolean canReadRestrictedMessages) {
 
-        String smsQueryReadRestrictionClause = Flags.secureAccessToRestrictedRcsMessages()
-        ? ("AND " + getTextSearchQueryReadRestrictionWhereClaused(smsTable,
-                        canReadRestrictedMessages)) : "";
+        // Append read restriction clause to the query if the caller can't read restricted messages.
+        String smsQueryReadRestrictionClause =
+                Flags.secureAccessToRestrictedRcsMessages() && !canReadRestrictedMessages
+                        ? (" AND " + getRestrictedTextSearchQueryWhereClause(smsTable)) : "";
         // Search on the words table but return the rows from the corresponding sms table
         final String smsQuery = "SELECT "
                 + smsTable + "._id AS _id,"
@@ -229,9 +230,10 @@ public class MmsSmsProvider extends ContentProvider {
                 + smsQueryReadRestrictionClause
                 + "AND words.table_to_use=1)";
 
-        String mmsQueryReadRestrictionClause = Flags.secureAccessToRestrictedRcsMessages()
-        ? ("AND " + getTextSearchQueryReadRestrictionWhereClaused(pduTable,
-                        canReadRestrictedMessages)) : "";
+        // Append read restriction clause to the query if the caller can't read restricted messages.
+        String mmsQueryReadRestrictionClause =
+                Flags.secureAccessToRestrictedRcsMessages() && !canReadRestrictedMessages
+                        ? (" AND " + getRestrictedTextSearchQueryWhereClause(pduTable)) : "";
         // Search on the words table but return the rows from the corresponding parts table
         final String mmsQuery = "SELECT "
                 + pduTable + "._id,"
@@ -262,11 +264,15 @@ public class MmsSmsProvider extends ContentProvider {
                 + "ORDER BY thread_id ASC, date DESC";
     }
 
-    private static String getTextSearchQueryReadRestrictionWhereClaused(String table,
-            boolean canReadRestrictedMessages) {
-        return " (" + table + "." + ThreadsColumns.READ_RESTRICTION + " & "
-        + ReadRestrictionValues.READ_RESTRICTION_RESTRICTED + " = 0 OR "
-            + canReadRestrictedMessages + ")";
+    /**
+     *  Returns the WHERE clause with {@link ReadRestriction.RESTRICTED} column set to 0 to filter
+     *  out restricted messages.
+     *
+     * @param table The name of the table to read the {@link ReadRestriction.RESTRICTED}
+     *        column from.
+     */
+    private static String getRestrictedTextSearchQueryWhereClause(String table) {
+        return " (" + table + "." + ReadRestriction.RESTRICTED + " = 0) ";
     }
 
     private static final String AUTHORITY = "mms-sms";

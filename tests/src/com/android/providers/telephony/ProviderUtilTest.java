@@ -18,30 +18,38 @@ package com.android.providers.telephony;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.mockito.Mockito.anyString;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import android.app.AppOpsManager;
 import android.content.Context;
-import android.os.UserHandle;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+import android.content.pm.verify.domain.DomainVerificationManager;
 import android.os.Process;
+import android.os.UserHandle;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
+import android.provider.Telephony;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.telephony.emergency.EmergencyNumber;
-import com.android.internal.telephony.flags.Flags;
 
 import androidx.test.core.app.ApplicationProvider;
 
+import com.android.internal.telephony.flags.Flags;
+
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
 import org.junit.Rule;
+import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -61,6 +69,8 @@ public class ProviderUtilTest {
     private TelephonyManager mTelephonyManager;
     @Mock
     private AppOpsManager mAppOpsManager;
+    @Mock
+    private PackageManager mPackageManager;
 
     private Map<Integer, List<EmergencyNumber>> mEmergencyNumberList;
 
@@ -75,6 +85,7 @@ public class ProviderUtilTest {
         when(mContext.getSystemService(SubscriptionManager.class)).thenReturn(mSubscriptionManager);
         when(mContext.getSystemService(TelephonyManager.class)).thenReturn(mTelephonyManager);
         when(mContext.getSystemService(Context.APP_OPS_SERVICE)).thenReturn(mAppOpsManager);
+        when(mContext.getPackageManager()).thenReturn(mPackageManager);
     }
 
     @After
@@ -269,5 +280,64 @@ public class ProviderUtilTest {
     public void allowInteractWithEntryOfSubId() {
         assertThat(ProviderUtil.allowInteractingWithEntryOfSubscription(mContext,
                 SubscriptionManager.INVALID_SUBSCRIPTION_ID, UserHandle.SYSTEM)).isTrue();
+    }
+
+    @Test
+    public void testGetOtpWhereFilter_basic() throws Exception {
+        when(mPackageManager.getPackageInfoAsUser(anyString(), anyInt(), anyInt()))
+                .thenThrow(new PackageManager.NameNotFoundException());
+        String filter = ProviderUtil.getOtpWhereFilter(mContext, EXAMPLE_PACKAGE_NAME,
+                UserHandle.SYSTEM);
+        assertThat(filter).isNotNull();
+        assertThat(filter).contains(Telephony.Sms.DATE);
+        assertThat(filter).contains(Telephony.Sms.CONTAINS_OTP);
+    }
+
+    @Test
+    public void testGetOtpWhereFilter_withPackageHash() throws Exception {
+        PackageInfo packageInfo = new PackageInfo();
+        packageInfo.packageName = EXAMPLE_PACKAGE_NAME;
+        // PackageBasedTokenUtil expects signatures to be present to generate a hash.
+        Signature signature = new Signature("1234567890abcdef");
+        packageInfo.signatures = new Signature[]{signature};
+
+        when(mPackageManager.getPackageInfoAsUser(eq(EXAMPLE_PACKAGE_NAME),
+                eq(PackageManager.GET_SIGNATURES), anyInt())).thenReturn(packageInfo);
+
+        String filter = ProviderUtil.getOtpWhereFilter(mContext, EXAMPLE_PACKAGE_NAME,
+                UserHandle.SYSTEM);
+
+        // Verify that the filter contains a LIKE clause for the package-based token.
+        assertThat(filter).contains("body LIKE '%");
+    }
+
+    @Test
+    public void testGetOtpWhereFilter_noPackageHash() throws Exception {
+        when(mPackageManager.getPackageInfoAsUser(anyString(), anyInt(), anyInt()))
+                .thenThrow(new PackageManager.NameNotFoundException());
+
+        String filter = ProviderUtil.getOtpWhereFilter(mContext, EXAMPLE_PACKAGE_NAME,
+                UserHandle.SYSTEM);
+
+        assertThat(filter).doesNotContain("body LIKE");
+    }
+
+    @Test
+    public void testGetOtpWhereFilter_domainVerificationManagerException_failsGracefully()
+            throws Exception {
+        // Stub getPackageInfoAsUser to avoid NPE in PackageBasedTokenUtil
+        when(mPackageManager.getPackageInfoAsUser(anyString(), anyInt(), anyInt()))
+                .thenThrow(new PackageManager.NameNotFoundException());
+
+        // Force getSystemService to return null, which will cause an NPE in getVerifiedDomainSql
+        // which should be caught and handled gracefully in ProviderUtil.
+        when(mContext.getSystemService(DomainVerificationManager.class)).thenReturn(null);
+
+        String filter = ProviderUtil.getOtpWhereFilter(mContext, EXAMPLE_PACKAGE_NAME,
+                UserHandle.SYSTEM);
+
+        // The filter should still be valid and contain the basic redaction logic.
+        assertThat(filter).isNotNull();
+        assertThat(filter).contains(Telephony.Sms.DATE);
     }
 }

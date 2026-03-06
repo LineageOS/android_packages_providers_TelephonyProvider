@@ -19,9 +19,7 @@ package com.android.providers.telephony;
 import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.RequiresPermission;
-import android.annotation.SuppressLint;
 import android.app.AppOpsManager;
-import android.app.compat.CompatChanges;
 import android.content.BroadcastReceiver;
 import android.content.ContentProvider;
 import android.content.ContentResolver;
@@ -31,8 +29,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.UriMatcher;
 import android.content.pm.PackageManager;
-import android.content.pm.verify.domain.DomainVerificationInfo;
-import android.content.pm.verify.domain.DomainVerificationManager;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.MatrixCursor;
@@ -65,7 +61,6 @@ import android.view.textclassifier.TextClassifier;
 import android.view.textclassifier.TextLinks;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.telephony.PackageBasedTokenUtil;
 import com.android.internal.telephony.SmsApplication;
 import com.android.internal.telephony.TelephonyPermissions;
 import com.android.internal.telephony.flags.Flags;
@@ -74,7 +69,6 @@ import com.android.internal.telephony.util.TelephonyUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -143,7 +137,6 @@ public class SmsProvider extends ContentProvider {
     };
 
     private static final Integer ONE = Integer.valueOf(1);
-    private static final int MAX_ALLOWED_VERIFIED_DOMAINS = 5;
 
     private static final String[] CONTACT_QUERY_PROJECTION =
             new String[] { Contacts.Phones.PERSON_ID };
@@ -151,14 +144,6 @@ public class SmsProvider extends ContentProvider {
 
     /** Delete any raw messages or message segments marked deleted that are older than an hour. */
     private static final long RAW_MESSAGE_EXPIRE_AGE_MS = TimeUnit.HOURS.toMillis(1);
-
-    /** A possible OTP message should only remain in its "pending otp classification" state for
-     * up to 5 seconds
-     */
-    private static final long OTP_CLASSIFICATION_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
-
-    /** OTP messages should be redacted for 3 hours */
-    private static final long OTP_HIDING_TIME_MS = TimeUnit.HOURS.toMillis(3);
 
     /**
      * These are the columns that are available when reading SMS
@@ -543,37 +528,8 @@ public class SmsProvider extends ContentProvider {
             if (Telephony.Sms.isOtpRedactionEnabled(getContext())
                     && qb.getTables().startsWith(smsTable)
                     && !canReadOtpSms(callingUid, callingPackage)) {
-                // If this app can't read OTP messages, only return messages without OTPs, or
-                // messages more than the threshold old, or messages still pending classification,
-                // past the classification cutoff time.
-                long startOfCurrentMinuteInMs = (System.currentTimeMillis() / 60000) * 60000;
-                long otpCutoff = startOfCurrentMinuteInMs - OTP_HIDING_TIME_MS;
-                long startOfCurrentSecondInMs = (System.currentTimeMillis() / 1000) * 1000;
-                long pendingOtpCutoff = startOfCurrentSecondInMs - OTP_CLASSIFICATION_TIMEOUT_MS;
-                @SuppressLint("DefaultLocale")
-                final StringBuilder where = new StringBuilder(String.format(
-                        " %s OR %s < %d OR (%s AND %s < %d)",
-                        getContainsOtpSqlFilter(Sms.OTP_TYPE_NONE), Sms.DATE, otpCutoff,
-                        getContainsOtpSqlFilter(Sms.OTP_TYPE_PENDING), Sms.DATE, pendingOtpCutoff));
-                final String hash = PackageBasedTokenUtil.generatePackageBasedToken(
-                        getContext().getPackageManager(), callingPackage, callerUserHandle);
-                if (hash != null) {
-                    where.append(String.format(" OR (%s LIKE '%%%s%%')",
-                            Sms.BODY, hash));
-                }
-                // Note: For backwards compatibility, we allow packages with
-                // targetSdk < CINNAMON_BUN to read generic OTP messages.
-                if (android.view.flags.Flags.redactOtpAppCompatApi()
-                        && !CompatChanges.isChangeEnabled(SmsManager.FILTER_GENERIC_OTP,
-                                callingPackage, Binder.getCallingUserHandle())) {
-                  where.append(String.format(" OR %s", getContainsGenericOtpSqlFilter()));
-                }
-                // Note: For backwards compatibility, we allow read access to verified owners of
-                // the domain found in Web OTPs.
-                if (android.view.flags.Flags.redactWebOtpSmsApi()) {
-                    where.append(getVerifiedDomainSql(callingPackage));
-                }
-                qb.appendWhereStandalone(where.toString());
+                qb.appendWhereStandalone(ProviderUtil.getOtpWhereFilter(getContext(),
+                        callingPackage, callerUserHandle));
             }
 
             Cursor ret = qb.query(db, projectionIn, selection, selectionArgs,
@@ -584,77 +540,6 @@ public class SmsProvider extends ContentProvider {
             return ret;
         } finally {
             Trace.endSection();
-        }
-    }
-
-    private String getContainsOtpSqlFilter(int containsOtpType) {
-        if (android.view.flags.Flags.redactOtpAppCompatApi()) {
-            return String.format("((%s & %d) = %d)",
-                   Telephony.Sms.CONTAINS_OTP, Telephony.Sms.OTP_TYPE_MASK, containsOtpType);
-        }
-        return String.format("(%s = %d)", Telephony.Sms.CONTAINS_OTP, containsOtpType);
-    }
-
-    private String getContainsGenericOtpSqlFilter() {
-        // Generic OTP is an OTP that does not follow standards defined by either
-        // SMS Hash Retriever standards or Web OTP standards.
-        return String.format("((%s & %s) = %s)",
-               Telephony.Sms.CONTAINS_OTP,
-               Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
-               Telephony.Sms.OTP_SUBTYPE_NONE | Telephony.Sms.OTP_TYPE_CONTAINS_OTP);
-    }
-
-    // Returns SQL string to be appended to the where clause of the main query which will match
-    // Web OTP rows containing a verified domain owned by `callingPackageName`.
-    // Returns an empty string if the package has no verified domains, or if an exception is
-    // encountered.
-    private String getVerifiedDomainSql(String callingPackageName) {
-        try {
-            DomainVerificationManager domainVerificationManager =
-                    getContext().getSystemService(DomainVerificationManager.class);
-            DomainVerificationInfo domainVerificationInfo =
-                    domainVerificationManager.getDomainVerificationInfo(callingPackageName);
-            if (domainVerificationInfo != null
-                    && !domainVerificationInfo.getHostToStateMap().isEmpty()) {
-                StringBuilder verifiedDomainSql = new StringBuilder();
-                for (Map.Entry<String, Integer> hostToVerificationState :
-                        domainVerificationInfo.getHostToStateMap().entrySet()) {
-                    String domain = hostToVerificationState.getKey();
-                    Integer verificationState = hostToVerificationState.getValue();
-                    boolean isDomainVerified =
-                          verificationState == DomainVerificationInfo.STATE_MODIFIABLE_VERIFIED
-                          || verificationState == DomainVerificationInfo.STATE_SUCCESS;
-                    // To avoid performance issue and potential abuse, we currently set a hard-limit
-                    // to the number of verified domains allowed.
-                    if (isDomainVerified && verifiedDomainSql.length()
-                            < MAX_ALLOWED_VERIFIED_DOMAINS) {
-                        // Match a "@<domain> #" substring.
-                        String containsDomainSql = String.format(
-                            "(%s LIKE '%%@%s #%%')", Sms.BODY, domain);
-                        if (verifiedDomainSql.length() != 0) {
-                            verifiedDomainSql.append(" OR ");
-                        }
-                        verifiedDomainSql.append(containsDomainSql);
-                    }
-                }
-                if (verifiedDomainSql.length() != 0) {
-                    // Roughly translates to the following query:
-                    // "OR ((contains_otp & 0xFFFF) = <bitmask for WEB OTP>"
-                    // "AND (body LIKE '%@<domain1> #%' OR body LIKE '%@<domain2> #%' OR ...)"
-                    return String.format(" OR ((%s & %s) = %s AND (%s))",
-                        Telephony.Sms.CONTAINS_OTP,
-                        Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
-                        android.view.flags.Flags.redactOtpAppCompatApi() ?
-                            Telephony.Sms.OTP_SUBTYPE_WEB_OTP | Telephony.Sms.OTP_TYPE_CONTAINS_OTP
-                                : Telephony.Sms.OTP_TYPE_CONTAINS_OTP,
-                        verifiedDomainSql.toString());
-                }
-                return "";
-            }
-            return "";
-        } catch (Exception e) {
-            // In case of exceptions, fail gracefully.
-            return "";
         }
     }
 
@@ -1344,7 +1229,7 @@ public class SmsProvider extends ContentProvider {
                         ContentValues unredacted = new ContentValues();
                         unredacted.put(Sms.CONTAINS_OTP, Sms.OTP_TYPE_NONE);
                         updateWithRetry(uri, unredacted, "scheduleOtpCheck: unredact", 1);
-                    }, OTP_HIDING_TIME_MS);
+                    }, ProviderUtil.OTP_HIDING_TIME_MS);
                 }
             } finally {
                 Trace.endSection();
@@ -1370,9 +1255,9 @@ public class SmsProvider extends ContentProvider {
         }
     }
 
-    @SuppressLint("MissingPermission")
+    // This method is to allow override in subclass used for testing on an in-memory database
     protected boolean canReadOtpSms(int uid, String packageName) {
-        return SmsManager.isAppTrustedForSmsOtp(getContext(), packageName, uid);
+        return ProviderUtil.canReadOtpSms(getContext(), uid, packageName);
     }
 
     /**

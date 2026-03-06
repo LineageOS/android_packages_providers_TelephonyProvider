@@ -667,9 +667,6 @@ public class SmsProvider extends ContentProvider {
     }
 
     protected boolean canReadRawTable(int uid, String packageName) {
-        if (!Flags.limitRawTableVisibility()) {
-            return true;
-        }
         return TelephonyPermissions.isSystemOrPhone(uid)
                 || SmsApplication.isDefaultSmsApplication(getContext(), packageName);
     }

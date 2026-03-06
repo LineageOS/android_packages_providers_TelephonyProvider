@@ -18,25 +18,29 @@
 package com.android.providers.telephony;
 
 import android.content.ContentProvider;
-import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.UriMatcher;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
-import android.database.Cursor;
-import android.database.SQLException;
 import android.net.Uri;
+import android.os.Binder;
 import android.text.TextUtils;
 import android.util.Log;
-import java.util.HashMap;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.HbpcdLookup;
+import com.android.internal.telephony.HbpcdLookup.ArbitraryMccSidMatch;
 import com.android.internal.telephony.HbpcdLookup.MccIdd;
 import com.android.internal.telephony.HbpcdLookup.MccLookup;
 import com.android.internal.telephony.HbpcdLookup.MccSidConflicts;
-import com.android.internal.telephony.HbpcdLookup.ArbitraryMccSidMatch;
 import com.android.internal.telephony.HbpcdLookup.MccSidRange;
 import com.android.internal.telephony.HbpcdLookup.NanpAreaCode;
+import com.android.internal.telephony.SmsApplication;
+import com.android.internal.telephony.TelephonyPermissions;
+import com.android.internal.telephony.flags.Flags;
+
+import java.util.HashMap;
 
 public class HbpcdLookupProvider extends ContentProvider {
     private static boolean DBG = false;
@@ -143,14 +147,22 @@ public class HbpcdLookupProvider extends ContentProvider {
         sArbitraryProjectionMap.put(ArbitraryMccSidMatch.SID, ArbitraryMccSidMatch.SID);
     }
 
-    private HbpcdLookupDatabaseHelper mDbHelper;
+    @VisibleForTesting
+    HbpcdLookupDatabaseHelper mDbHelper;
+
+    @VisibleForTesting
+    void injectDatabaseHelper(HbpcdLookupDatabaseHelper dbHelper) {
+        mDbHelper = dbHelper;
+    }
 
     @Override
     public boolean onCreate() {
         if (DBG) {
             Log.d(TAG, "onCreate");
         }
-        mDbHelper = new HbpcdLookupDatabaseHelper(getContext());
+        if (mDbHelper == null) {
+            mDbHelper = new HbpcdLookupDatabaseHelper(getContext());
+        }
 
         mDbHelper.getReadableDatabase();
         return true;
@@ -165,9 +177,60 @@ public class HbpcdLookupProvider extends ContentProvider {
         return null;
     }
 
+    private boolean isAccessRestricted() {
+        int callingUid = Binder.getCallingUid();
+        if (TelephonyPermissions.isSystemOrPhone(callingUid)) {
+            if (DBG) {
+                Log.d(TAG, "isAccessRestricted: System or Phone callingUid=" + callingUid
+                        + " -> allowed");
+            }
+            return false;
+        }
+
+        String callingPackage = null;
+        try {
+            callingPackage = getCallingPackage();
+        } catch (SecurityException e) {
+            // This can happen if the calling package is not what we expect it to be
+            // in some IPC flows.
+            Log.e(TAG, "isAccessRestricted: SecurityException while getting calling package", e);
+        }
+
+        if (!TextUtils.isEmpty(callingPackage)) {
+            if (SmsApplication.isDefaultSmsApplication(getContext(), callingPackage)) {
+                if (DBG) {
+                    Log.d(TAG, "isAccessRestricted: Default SMS pkg="
+                            + callingPackage + " in UID -> allowed");
+                }
+                return false;
+            }
+        }
+
+        // Check if any of the packages for the UID is the default SMS app
+        String[] packages = getContext().getPackageManager().getPackagesForUid(callingUid);
+        if (packages != null) {
+            for (String pkg : packages) {
+                if (SmsApplication.isDefaultSmsApplication(getContext(), pkg)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     @Override
     public Cursor query(Uri uri, String[] projectionIn, String selection,
                         String[] selectionArgs, String sortOrder) {
+        if (Flags.fixSqlInjectionHbpcd() && isAccessRestricted()) {
+            try {
+                SqlQueryChecker.checkQueryParametersForSubqueries(projectionIn, selection,
+                        sortOrder);
+            } catch (IllegalArgumentException e) {
+                Log.e(TAG, "Query rejected: " + e.getMessage());
+                return null;
+            }
+        }
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
         String orderBy = null;
         String groupBy = null;

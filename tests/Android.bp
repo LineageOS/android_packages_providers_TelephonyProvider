@@ -26,6 +26,9 @@ android_test {
         "src/**/*.java",
         ":telephonyprovider-shared-srcs",
     ],
+    java_resources: [
+        ":sample_apns_conf",
+    ],
     platform_apis: true,
     test_suites: ["device-tests"],
     certificate: "platform",

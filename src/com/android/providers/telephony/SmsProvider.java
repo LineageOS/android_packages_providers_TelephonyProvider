@@ -1681,7 +1681,14 @@ public class SmsProvider extends ContentProvider {
         where = DatabaseUtils.concatenateWhere(where, filter);
 
         where = DatabaseUtils.concatenateWhere(where, extraWhere);
-        count = db.update(table, values, where, whereArgs);
+
+        if (Flags.secureAccessToRestrictedRcsMessages()
+            && values.containsKey(ReadRestriction.READ_RESTRICTION_COLUMN_NAME)) {
+            count = ReadRestriction.performReadRestrictionDatabaseUpdate(
+                db, table, values, where, whereArgs);
+        } else {
+            count = db.update(table, values, where, whereArgs);
+        }
 
         if (count > 0) {
             if (Log.isLoggable(TAG, Log.VERBOSE)) {

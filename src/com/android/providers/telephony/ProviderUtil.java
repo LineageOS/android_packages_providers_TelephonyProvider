@@ -390,9 +390,11 @@ public class ProviderUtil {
         // If this app can't read OTP messages, only return messages without OTPs, or
         // messages more than the threshold old, or messages still pending classification,
         // past the classification cutoff time.
-        long startOfCurrentMinuteInMs = (System.currentTimeMillis() / 60000) * 60000;
+        long startOfCurrentMinuteInMs = (System.currentTimeMillis() / TimeUnit.MINUTES.toMillis(1))
+                * TimeUnit.MINUTES.toMillis(1);
         long otpCutoff = startOfCurrentMinuteInMs - OTP_HIDING_TIME_MS;
-        long startOfCurrentSecondInMs = (System.currentTimeMillis() / 1000) * 1000;
+        long startOfCurrentSecondInMs = (System.currentTimeMillis() / TimeUnit.SECONDS.toMillis(1))
+                * TimeUnit.SECONDS.toMillis(1);
         long pendingOtpCutoff = startOfCurrentSecondInMs - OTP_CLASSIFICATION_TIMEOUT_MS;
         final StringBuilder where = new StringBuilder("(");
         where.append(String.format(

@@ -60,6 +60,7 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests for testing CRUD operations of SmsProvider.
@@ -390,6 +391,68 @@ public class SmsProviderTest extends TestCase {
         } finally {
             mSmsProviderTestable.mLockedExceptionCountToSimulate = 0;
         }
+    }
+
+    @Test
+    @SmallTest
+    public void testInsertOldOtp_skipsClassification() {
+        final ContentValues values = new ContentValues();
+        values.put(Telephony.Sms.ADDRESS, "12345");
+        values.put(Telephony.Sms.BODY, "Your OTP code is 123456");
+        // 4 hours ago
+        long oldDate = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(4);
+        values.put(Telephony.Sms.DATE, oldDate);
+        values.put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX);
+        values.put(Telephony.Sms.THREAD_ID, 1);
+
+        Uri uri = mContentResolver.insert(Uri.parse("content://sms"), values);
+        assertNotNull(uri);
+
+        // Query directly from the database to avoid restricted view issues in tests
+        try (Cursor cursor = mSmsProviderTestable.mCeOpenHelper.getReadableDatabase().query(
+                "sms", new String[]{Telephony.Sms.CONTAINS_OTP},
+                "_id=?", new String[]{uri.getLastPathSegment()}, null, null, null)) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(Telephony.Sms.OTP_TYPE_NONE, cursor.getInt(0));
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testInsertRecentOtp_triggersClassification() {
+        final ContentValues values = new ContentValues();
+        values.put(Telephony.Sms.ADDRESS, "12345");
+        values.put(Telephony.Sms.BODY, "Your OTP code is 123456");
+        // 1 hour ago
+        long recentDate = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(1);
+        values.put(Telephony.Sms.DATE, recentDate);
+        values.put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX);
+        values.put(Telephony.Sms.THREAD_ID, 1);
+
+        Uri uri = mContentResolver.insert(Uri.parse("content://sms"), values);
+        assertNotNull(uri);
+
+        // Query directly from the database to avoid restricted view issues in tests
+        try (Cursor cursor = mSmsProviderTestable.mCeOpenHelper.getReadableDatabase().query(
+                "sms", new String[]{Telephony.Sms.CONTAINS_OTP},
+                "_id=?", new String[]{uri.getLastPathSegment()}, null, null, null)) {
+            assertTrue(cursor.moveToFirst());
+            // Should be PENDING initially
+            assertEquals(Telephony.Sms.OTP_TYPE_PENDING, cursor.getInt(0));
+        }
+
+        // Wait for classification to finish to avoid IllegalStateException in tearDown
+        eventually(() -> {
+            try (Cursor c = mSmsProviderTestable.mCeOpenHelper.getReadableDatabase().query(
+                    "sms", new String[]{Telephony.Sms.CONTAINS_OTP},
+                    "_id=?", new String[]{uri.getLastPathSegment()}, null, null, null)) {
+                assertTrue(c.moveToFirst());
+                int containsOtp = c.getInt(0);
+                assertTrue("OTP classification should no longer be PENDING. Current value: "
+                                + containsOtp,
+                        containsOtp != Telephony.Sms.OTP_TYPE_PENDING);
+            }
+        });
     }
 
     private ContentValues getFakeRawValue() {

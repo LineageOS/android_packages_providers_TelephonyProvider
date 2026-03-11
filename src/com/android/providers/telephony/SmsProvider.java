@@ -1027,7 +1027,10 @@ public class SmsProvider extends ContentProvider {
                 // Determine if incoming messages contain an OTP code
                 String message = values.getAsString(Sms.BODY);
                 int otpType;
-                if (Telephony.Sms.shouldCheckForOtp(getContext(), message)) {
+                Long date = values.getAsLong(Sms.DATE);
+                if (date != null
+                        && date > System.currentTimeMillis() - ProviderUtil.OTP_HIDING_TIME_MS
+                        && Telephony.Sms.shouldCheckForOtp(getContext(), message)) {
                     otpType = Telephony.Sms.OTP_TYPE_PENDING;
                     possibleOtpMessage = message;
                 } else {

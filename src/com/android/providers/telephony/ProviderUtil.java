@@ -49,6 +49,7 @@ import com.android.internal.telephony.flags.Flags;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -397,14 +398,14 @@ public class ProviderUtil {
                 * TimeUnit.SECONDS.toMillis(1);
         long pendingOtpCutoff = startOfCurrentSecondInMs - OTP_CLASSIFICATION_TIMEOUT_MS;
         final StringBuilder where = new StringBuilder("(");
-        where.append(String.format(
+        where.append(String.format(Locale.US,
                 " %s OR %s < %d OR (%s AND %s < %d)",
                 getContainsOtpSqlFilter(Telephony.Sms.OTP_TYPE_NONE), Telephony.Sms.DATE, otpCutoff,
                 getOtpPendingSqlFilter(), Telephony.Sms.DATE, pendingOtpCutoff));
         final String hash = PackageBasedTokenUtil.generatePackageBasedToken(
                 context.getPackageManager(), callingPackage, userHandle);
         if (hash != null) {
-            where.append(String.format(" OR (%s LIKE '%%%s%%')",
+            where.append(String.format(Locale.US, " OR (%s LIKE '%%%s%%')",
                     Telephony.Sms.BODY, hash));
         }
         // Note: For backwards compatibility, we allow packages with
@@ -412,7 +413,7 @@ public class ProviderUtil {
         if (android.view.flags.Flags.redactOtpAppCompatApi()
                 && !CompatChanges.isChangeEnabled(SmsManager.FILTER_GENERIC_OTP,
                 callingPackage, userHandle)) {
-            where.append(String.format(" OR %s", getContainsGenericOtpSqlFilter()));
+            where.append(String.format(Locale.US, " OR %s", getContainsGenericOtpSqlFilter()));
         }
         // Note: For backwards compatibility, we allow read access to verified owners of
         // the domain found in Web OTPs.
@@ -425,10 +426,10 @@ public class ProviderUtil {
 
     private static String getContainsOtpSqlFilter(int containsOtpType) {
         if (android.view.flags.Flags.redactOtpAppCompatApi()) {
-            return String.format("((%s & %d) = %d)",
+            return String.format(Locale.US, "((%s & %d) = %d)",
                     Telephony.Sms.CONTAINS_OTP, Telephony.Sms.OTP_TYPE_MASK, containsOtpType);
         }
-        return String.format("(%s = %d)", Telephony.Sms.CONTAINS_OTP, containsOtpType);
+        return String.format(Locale.US, "(%s = %d)", Telephony.Sms.CONTAINS_OTP, containsOtpType);
     }
 
     private static String getOtpPendingSqlFilter() {
@@ -438,7 +439,7 @@ public class ProviderUtil {
     private static String getContainsGenericOtpSqlFilter() {
         // Generic OTP is an OTP that does not follow standards defined by either
         // SMS Hash Retriever standards or Web OTP standards.
-        return String.format("((%s & %s) = %s)",
+        return String.format(Locale.US, "((%s & %s) = %s)",
                 Telephony.Sms.CONTAINS_OTP,
                 Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
                 Telephony.Sms.OTP_SUBTYPE_NONE | Telephony.Sms.OTP_TYPE_CONTAINS_OTP);
@@ -470,7 +471,7 @@ public class ProviderUtil {
                     if (isDomainVerified && verifiedDomainSql.length()
                             < MAX_ALLOWED_VERIFIED_DOMAINS) {
                         // Match a "@<domain> #" substring.
-                        String containsDomainSql = String.format(
+                        String containsDomainSql = String.format(Locale.US,
                                 "(%s LIKE '%%@%s #%%')", Telephony.Sms.BODY, domain);
                         if (verifiedDomainSql.length() != 0) {
                             verifiedDomainSql.append(" OR ");
@@ -482,7 +483,7 @@ public class ProviderUtil {
                     // Roughly translates to the following query:
                     // "OR ((contains_otp & 0xFFFF) = <bitmask for WEB OTP>"
                     // "AND (body LIKE '%@<domain1> #%' OR body LIKE '%@<domain2> #%' OR ...)"
-                    return String.format(" OR ((%s & %s) = %s AND (%s))",
+                    return String.format(Locale.US, " OR ((%s & %s) = %s AND (%s))",
                             Telephony.Sms.CONTAINS_OTP,
                             Telephony.Sms.OTP_SUBTYPE_MASK | Telephony.Sms.OTP_TYPE_MASK,
                             android.view.flags.Flags.redactOtpAppCompatApi()

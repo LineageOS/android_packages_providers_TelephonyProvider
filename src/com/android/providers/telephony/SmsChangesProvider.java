@@ -36,6 +36,8 @@ import android.util.Log;
  * This provider does not notify of changes.
  * Interested observers should instead listen to notification on sms table, instead.
  */
+// TODO (b/490136378): Remove this class as it is not used in Automotive or Android but may
+// be referenced in third-party non-Automotive apps.
 public class SmsChangesProvider extends ContentProvider {
     private final static String TAG = "SmsChangesProvider";
 
@@ -72,6 +74,13 @@ public class SmsChangesProvider extends ContentProvider {
         }
 
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
+        try {
+            SqlQueryChecker.checkQueryParametersForSubqueries(projectionIn, selection, sort);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Query rejected: " + e.getMessage());
+            return null;
+        }
+
         qb.setTables(TABLE_SMS_CHANGES);
         SQLiteDatabase db = mCeOpenHelper.getReadableDatabase();
         return qb.query(db, projectionIn, selection, selectionArgs,

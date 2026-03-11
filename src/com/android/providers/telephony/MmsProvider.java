@@ -1317,7 +1317,14 @@ public class MmsProvider extends ContentProvider {
             ((MmsSmsDatabaseHelper) mOpenHelper).addDatabaseOpeningDebugLog(
                     callerPkg + ";MmsProvider.update;" + uri, false);
         }
-        int count = db.update(table, finalValues, finalSelection, selectionArgs);
+        int count = 0;
+        if (Flags.secureAccessToRestrictedRcsMessages()
+            && finalValues.containsKey(ReadRestriction.READ_RESTRICTION_COLUMN_NAME)) {
+            count = ReadRestriction.performReadRestrictionDatabaseUpdate(
+                db, table, finalValues, finalSelection, selectionArgs);
+        } else {
+            count = db.update(table, finalValues, finalSelection, selectionArgs);
+        }
         if (notify && (count > 0)) {
             // If this message was upgraded, evaluate its new status and dispatch
             // any associated PendingIntents to notify the sender.

@@ -1320,7 +1320,8 @@ public class SmsProvider extends ContentProvider {
         // The delete operation is already restricted to WRITE_SMS permission, so we don't need
         // further restriction for deleting restricted messages.
         if (Flags.secureAccessToRestrictedRcsMessages()) {
-            SqlQueryChecker.checkQueryForForbiddenColumns(whereArgs, where, null, TAG);
+            SqlQueryChecker.checkQueryForForbiddenColumns(/* projection= */ null, where,
+                    /* sortOrder= */ null, TAG);
         }
 
         String filter = "";
@@ -1569,7 +1570,8 @@ public class SmsProvider extends ContentProvider {
                     callerPkg + ";SmsProvider.update;" + url, false);
         }
         if (Flags.secureAccessToRestrictedRcsMessages()) {
-            SqlQueryChecker.checkQueryForForbiddenColumns(whereArgs, where, null, TAG);
+            SqlQueryChecker.checkQueryForForbiddenColumns(/* projection= */ null, where,
+                    /* sortOrder= */ null, TAG);
         }
         if (callerUid != Process.myUid() && values.containsKey(Telephony.Sms.CONTAINS_OTP)) {
             // Apps are not allowed to update the CONTAINS_OTP column directly

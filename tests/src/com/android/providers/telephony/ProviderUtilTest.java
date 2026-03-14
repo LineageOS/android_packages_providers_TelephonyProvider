@@ -55,6 +55,7 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class ProviderUtilTest {
@@ -320,6 +321,36 @@ public class ProviderUtilTest {
                 UserHandle.SYSTEM);
 
         assertThat(filter).doesNotContain("body LIKE");
+    }
+
+    @Test
+    public void testGetOtpWhereFilter_arabicLocale_noArabicDigits() throws Exception {
+        Locale defaultLocale = Locale.getDefault();
+        try {
+            when(mPackageManager.getPackageInfoAsUser(anyString(), anyInt(), anyInt()))
+                    .thenThrow(new PackageManager.NameNotFoundException());
+
+            // Use a locale that explicitly requests Arabic-Indic numerals
+            Locale.setDefault(Locale.forLanguageTag("ar-u-nu-arab"));
+
+            String filter = ProviderUtil.getOtpWhereFilter(mContext, EXAMPLE_PACKAGE_NAME,
+                    UserHandle.SYSTEM);
+
+            // The filter should not contain Arabic digits (ASCII only for numeric constants).
+            // Arabic digits are in the range \u0660 - \u0669
+            assertThat(filter).doesNotContain("\u0660"); // ٠ (Zero)
+            assertThat(filter).doesNotContain("\u0661"); // ١ (One)
+            assertThat(filter).doesNotContain("\u0662"); // ٢ (Two)
+            assertThat(filter).doesNotContain("\u0663"); // ٣ (Three)
+            assertThat(filter).doesNotContain("\u0664"); // ٤ (Four)
+            assertThat(filter).doesNotContain("\u0665"); // ٥ (Five)
+            assertThat(filter).doesNotContain("\u0666"); // ٦ (Six)
+            assertThat(filter).doesNotContain("\u0667"); // ٧ (Seven)
+            assertThat(filter).doesNotContain("\u0668"); // ٨ (Eight)
+            assertThat(filter).doesNotContain("\u0669"); // ٩ (Nine)
+        } finally {
+            Locale.setDefault(defaultLocale);
+        }
     }
 
     @Test

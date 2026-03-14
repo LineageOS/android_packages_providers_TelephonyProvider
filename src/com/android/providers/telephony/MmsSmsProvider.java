@@ -414,12 +414,7 @@ public class MmsSmsProvider extends ContentProvider {
         final boolean canReadRestrictedMessages = ProviderUtil.canReadRestrictedMessages(
                 getContext(), callingPackage, callerUid);
 
-        final boolean canReadOtpSms = canReadOtpSms(callerUid, callingPackage);
-        String otpFilter = "";
-        if (!canReadOtpSms && Telephony.Sms.isOtpRedactionEnabled(getContext())) {
-            otpFilter = ProviderUtil.getOtpWhereFilter(getContext(), callingPackage,
-                    callerUserHandle);
-        }
+        String otpFilter = getOtpFilter(callerUid, callingPackage, callerUserHandle);
 
         Log.v(LOG_TAG, "#query: canReadRestrictedMessages=" + canReadRestrictedMessages);
 
@@ -585,6 +580,12 @@ public class MmsSmsProvider extends ContentProvider {
                         throw new UnsupportedOperationException(
                                 "URI_SEARCH_SUGGEST is not supported for non-default SMS app");
                     }
+                }
+                // Although the Flags.secureAccessToRestrictedRcsMessages() check above should
+                // restrict untrusted apps, this OTP filter check is performed unconditionally as
+                // a safety measure to ensure security even if the flag is disabled.
+                if (!TextUtils.isEmpty(otpFilter)) {
+                    return emptyCursor;
                 }
                 SEARCH_STRING[0] = uri.getQueryParameter("pattern") + '*' ;
 
@@ -1600,7 +1601,8 @@ public class MmsSmsProvider extends ContentProvider {
         // The delete operation is already restricted to WRITE_SMS permission, so we don't need
         // further restriction for deleting restricted messages.
         if (Flags.secureAccessToRestrictedRcsMessages()) {
-            SqlQueryChecker.checkQueryForForbiddenColumns(selectionArgs, selection, null, LOG_TAG);
+            SqlQueryChecker.checkQueryForForbiddenColumns(/* projection= */ null, selection,
+                    /* sortOrder= */ null, LOG_TAG);
         }
 
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
@@ -1829,8 +1831,15 @@ public class MmsSmsProvider extends ContentProvider {
     }
 
     // This method is to support unit test override
-    protected boolean canReadOtpSms(int callerUid, String callingPackage) {
-        return ProviderUtil.canReadOtpSms(getContext(), callerUid, callingPackage);
+    protected String getOtpFilter(int callerUid, String callingPackage,
+            UserHandle callerUserHandle) {
+        boolean canReadOtpSms = ProviderUtil.canReadOtpSms(getContext(), callerUid, callingPackage);
+        if (!canReadOtpSms && Telephony.Sms.isOtpRedactionEnabled(getContext())) {
+            return ProviderUtil.getOtpWhereFilter(getContext(), callingPackage,
+                    callerUserHandle);
+        } else {
+            return "";
+        }
     }
 
     private int updateConversation(String threadIdString, ContentValues values, String selection,

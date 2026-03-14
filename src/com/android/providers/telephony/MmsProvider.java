@@ -982,7 +982,8 @@ public class MmsProvider extends ContentProvider {
         // The delete operation is already restricted to WRITE_SMS permission, so we don't need
         // further restriction for deleting restricted messages.
         if (Flags.secureAccessToRestrictedRcsMessages()) {
-            SqlQueryChecker.checkQueryForForbiddenColumns(selectionArgs, selection, null, TAG);
+            SqlQueryChecker.checkQueryForForbiddenColumns(/* projection= */ null, selection,
+                    /* sortOrder= */ null, TAG);
         }
 
         String table, extraSelection = null;
@@ -1194,7 +1195,8 @@ public class MmsProvider extends ContentProvider {
             return 0;
         }
         if (Flags.secureAccessToRestrictedRcsMessages()) {
-            SqlQueryChecker.checkQueryForForbiddenColumns(selectionArgs, selection, null, TAG);
+            SqlQueryChecker.checkQueryForForbiddenColumns(/* projection= */ null, selection,
+                    /* sortOrder= */ null, TAG);
         }
         final int callerUid = Binder.getCallingUid();
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();

@@ -92,6 +92,7 @@ public class MmsSmsProviderTest {
     public void setUp() throws Exception {
         logd("Setup!");
         mContext = spy(ApplicationProvider.getApplicationContext());
+        doNothing().when(mContext).sendBroadcast(any());
         PackageManager pm = mContext.getPackageManager();
 
         // Check for telephony messaging feature
@@ -257,6 +258,21 @@ public class MmsSmsProviderTest {
 
         assertNotNull("Cursor should not be null", cursor);
         assertEquals("Cursor should be empty when otpFilter is active", 0, cursor.getCount());
+    }
+
+    @Test
+    public void testQuery_withNullProjection_doesNotThrowNPE() {
+        Cursor cursor = null;
+        try {
+            Uri testUri = Uri.parse("content://mms-sms/complete-conversations");
+            String[] projection = null;
+            // This should default to UNION_COLUMNS and not throw an NPE
+            cursor = mMmsSmsProvider.query(testUri, projection, null, null, null);
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
     }
 
     private void insertPresetData() {

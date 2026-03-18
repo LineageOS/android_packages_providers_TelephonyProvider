@@ -3779,7 +3779,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 1474
-  carrier_name: "Telecsa S.A."
+  carrier_name: "CNT Mobile"
   carrier_attribute {
     mccmnc_tuple: "74002"
   }
@@ -4202,7 +4202,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 1535
-  carrier_name: "Vodafone"
+  carrier_name: "One HU"
   carrier_attribute {
     mccmnc_tuple: "21670"
     spn: ""
@@ -6151,9 +6151,17 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 1821
-  carrier_name: "Edge Mobile LLC"
+  carrier_name: "Connect"
   carrier_attribute {
     mccmnc_tuple: "310840"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "26001"
+    gid1: "636F6E6E65637431"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "26006"
+    gid1: "636F6E6E65637431"
   }
 }
 carrier_id {
@@ -8293,7 +8301,7 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 2066
-  carrier_name: "Kajeet"
+  carrier_name: "Kajeet (Arterra)"
   carrier_attribute {
     mccmnc_tuple: "310260"
     gid1: "6136"
@@ -8855,9 +8863,21 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 2120
-  carrier_name: "FirstNet (Lab)"
+  carrier_name: "FirstNet 5G SA"
   carrier_attribute {
     mccmnc_tuple: "312670"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "313100"
+    gid1: "52FF"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "313130"
+    gid1: "52FF"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "313140"
+    gid1: "52FF"
   }
 }
 carrier_id {
@@ -8921,6 +8941,10 @@ carrier_id {
   carrier_name: "Spectrum Mobile"
   carrier_attribute {
     mccmnc_tuple: "311480"
+    gid1: "BA01490000000000"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "310599"
     gid1: "BA01490000000000"
   }
 }
@@ -13283,6 +13307,10 @@ carrier_id {
     mccmnc_tuple: "311480"
     gid1: "BA01500000000000"
   }
+  carrier_attribute {
+    mccmnc_tuple: "310599"
+    gid1: "BA01500000000000"
+  }
 }
 carrier_id {
   canonical_id: 2642
@@ -13404,6 +13432,14 @@ carrier_id {
   carrier_attribute {
     mccmnc_tuple: "206018"
     gid1: "8915518F"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "20628"
+    gid1: "A1B28915518C926E"
+  }
+  carrier_attribute {
+    mccmnc_tuple: "314470"
+    gid1: "A1B28915518C926E"
   }
 }
 carrier_id {
@@ -13862,6 +13898,48 @@ carrier_id {
   }
 }
 carrier_id {
+  canonical_id: 2712
+  carrier_name: "Cogeco"
+  carrier_attribute {
+    mccmnc_tuple: "302150"
+    gid1: "FFFF"
+  }
+}
+carrier_id {
+  canonical_id: 2713
+  carrier_name: "AO Mobile"
+  carrier_attribute {
+    mccmnc_tuple: "23415"
+    spn: "AO Mobile"
+    gid1: "34"
+  }
+}
+carrier_id {
+  canonical_id: 2714
+  carrier_name: "Starlink Mobile"
+  carrier_attribute {
+    mccmnc_tuple: "314850"
+  }
+}
+carrier_id {
+  canonical_id: 2715
+  carrier_name: "ONDO"
+  carrier_attribute {
+    mccmnc_tuple: "42833"
+    spn: "ONDO"
+  }
+}
+carrier_id {
+  canonical_id: 2716
+  carrier_name: "Tagtel Communications"
+  carrier_attribute {
+    mccmnc_tuple: "64812"
+    spn: "Tagtel"
+    gid1: "FF"
+    gid2: "FF"
+  }
+}
+carrier_id {
   canonical_id: 10000
   carrier_name: "Tracfone-ATT"
   carrier_attribute {
@@ -14122,4 +14200,4 @@ carrier_id {
   }
   parent_canonical_id: 2023
 }
-version: 33554515
+version: 33554516

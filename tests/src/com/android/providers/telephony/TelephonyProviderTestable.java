@@ -22,6 +22,8 @@ import android.util.Log;
 import androidx.test.InstrumentationRegistry;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.telephony.flags.Flags;
+import com.android.internal.telephony.util.WorkerThread;
 
 /**
  * A subclass of TelephonyProvider used for testing on an in-memory database
@@ -49,6 +51,9 @@ public class TelephonyProviderTestable extends TelephonyProvider {
         Log.d(TAG, "onCreate called: mDbHelper = new InMemoryTelephonyProviderDbHelper()");
         mDbHelper = new InMemoryTelephonyProviderDbHelper();
         s_apnSourceServiceExists = false;
+        if (Flags.writeSimAsync()) {
+            setBackupHandler(WorkerThread.getHandler());
+        }
         return true;
     }
 

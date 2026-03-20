@@ -171,6 +171,11 @@ public class TelephonyProvider extends ContentProvider
 
     private Handler mBackupHandler;
 
+    @VisibleForTesting
+    protected void setBackupHandler(Handler handler) {
+        mBackupHandler = handler;
+    }
+
     private static final int DATABASE_VERSION = 77 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;

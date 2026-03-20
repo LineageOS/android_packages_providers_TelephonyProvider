@@ -2613,4 +2613,40 @@ public class TelephonyProviderTest {
         // Verify getFilesDir() WAS called, indicating readSimSettingsLocked() was executed.
         verify(mContext, atLeastOnce()).getFilesDir();
     }
+
+    /**
+     * Non-SUW Scenario: Verify that disk read still happens when no cached bundle is provided,
+     * but the read results in an IOException.
+     */
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_WRITE_SIM_ASYNC)
+    public void testNonSUWRestoreDoesReadFromDisk_IoException() throws Exception {
+        setUpMockContext(true);
+
+        // Create the file to ensure readSimSettingsLocked doesn't return early
+        File fakeFilesDir = mContext.getFilesDir();
+        fakeFilesDir.mkdirs();
+        File backupFile = new File(fakeFilesDir, "sim_specific_settings_file");
+        backupFile.createNewFile();
+
+        // Write invalid data to cause IOException
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(backupFile)) {
+            fos.write("invalid data".getBytes());
+        }
+
+        Method restoreMethod = TelephonyProvider.class.getDeclaredMethod(
+                "restoreSimSpecificSettings", Bundle.class, String.class);
+        restoreMethod.setAccessible(true);
+
+        // bundle = null, iccId = "some_id" -> non-SUW case (e.g., SIM inserted later)
+        // This will attempt to read from the corrupted file and catch IOException
+        Boolean result = (Boolean) restoreMethod.invoke(mTelephonyProviderTestable, null,
+                "some_id");
+
+        // Verify getFilesDir() WAS called, indicating readSimSettingsLocked() was executed.
+        verify(mContext, atLeastOnce()).getFilesDir();
+
+        // The restore should return false or not crash, and log an error
+        assertFalse("Restoration should fail with invalid data", result);
+    }
 }

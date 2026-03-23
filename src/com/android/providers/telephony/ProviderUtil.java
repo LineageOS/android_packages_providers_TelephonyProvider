@@ -69,7 +69,7 @@ public class ProviderUtil {
     /** OTP messages should be redacted for 3 hours */
     public static final long OTP_HIDING_TIME_MS = TimeUnit.HOURS.toMillis(3);
 
-    private static final int MAX_ALLOWED_VERIFIED_DOMAINS = 5;
+    private static final int MAX_ALLOWED_VERIFIED_DOMAINS = 25;
 
     /**
      * Check if a caller of the provider has restricted access,

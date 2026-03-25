@@ -176,7 +176,7 @@ public class TelephonyProvider extends ContentProvider
         mBackupHandler = handler;
     }
 
-    private static final int DATABASE_VERSION = 77 << 16;
+    private static final int DATABASE_VERSION = 78 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -663,7 +663,7 @@ public class TelephonyProvider extends ContentProvider
                 + UserHandle.USER_NULL + ","
                 + Telephony.SimInfo.COLUMN_SATELLITE_ENABLED + " INTEGER DEFAULT 0,"
                 + Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER
-                + " INTEGER DEFAULT 1, "
+                + " INTEGER DEFAULT -1, "
                 + Telephony.SimInfo.COLUMN_IS_ONLY_NTN + " INTEGER DEFAULT 0, "
                 + Telephony.SimInfo.COLUMN_SERVICE_CAPABILITIES + " INTEGER DEFAULT "
                 + SubscriptionManager.getAllServiceCapabilityBitmasks() + ","
@@ -2314,6 +2314,24 @@ public class TelephonyProvider extends ContentProvider
                     }
                 }
                 oldVersion = 77 << 16 | 6;
+            }
+
+            if (oldVersion < (78 << 16 | 6)) {
+                // Satellite attach should follow the device-specific configuration overlay.
+                // Previous database versions incorrectly defaulted to 1 (enabled). We update
+                // all existing rows to -1 (unset) so the config overlay
+                // (config_satellite_enabled_reason_user_default) is respected.
+                try {
+                    db.execSQL("UPDATE " + SIMINFO_TABLE + " SET "
+                            + Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER
+                            + "=-1");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade failed to update " + SIMINFO_TABLE
+                                + " to set satellite attach enabled to unset (-1)");
+                    }
+                }
+                oldVersion = 78 << 16 | 6;
             }
 
             if (DBG) {
@@ -4299,7 +4317,7 @@ public class TelephonyProvider extends ContentProvider
                 PersistableBundle backedUpSimInfoEntry, int backupDataFormatVersion,
                 String isoCountryCodeFromDb, String allowedNetworkTypesForReasonsFromDb,
                 List<String> wfcRestoreBlockedCountries) {
-            if (DATABASE_VERSION != 77 << 16) {
+            if (DATABASE_VERSION != 78 << 16) {
                 throw new AssertionError("The database schema has been updated which might make "
                     + "the format of #BACKED_UP_SIM_SPECIFIC_SETTINGS_FILE outdated. Make sure to "
                     + "1) review whether any of the columns in #SIM_INFO_COLUMNS_TO_BACKUP have "

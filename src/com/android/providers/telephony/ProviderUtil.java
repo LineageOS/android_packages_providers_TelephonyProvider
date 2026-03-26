@@ -343,25 +343,27 @@ public class ProviderUtil {
     /**
      * Log all running processes of the telephony provider package.
      */
-    public static void logRunningTelephonyProviderProcesses(@NonNull Context context) {
+    public static int logRunningTelephonyProviderProcesses(@NonNull Context context) {
         ActivityManager am = context.getSystemService(ActivityManager.class);
         if (am == null) {
             Log.d(TAG, "logRunningTelephonyProviderProcesses: ActivityManager service is not"
                     + " available");
-            return;
+            return 0;
         }
 
         List<ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
         if (processInfos == null) {
             Log.d(TAG, "logRunningTelephonyProviderProcesses: processInfos is null");
-            return;
+            return 0;
         }
 
         StringBuilder sb = new StringBuilder();
+        int count = 0;
         for (ActivityManager.RunningAppProcessInfo processInfo : processInfos) {
             if (Arrays.asList(processInfo.pkgList).contains(TELEPHONY_PROVIDER_PACKAGE)
                     || UserHandle.isSameApp(processInfo.uid, Process.PHONE_UID)) {
                 sb.append("{ProcessName=");
+                count++;
                 sb.append(processInfo.processName);
                 sb.append(";PID=");
                 sb.append(processInfo.pid);
@@ -375,6 +377,7 @@ public class ProviderUtil {
             }
         }
         Log.d(TAG, "RunningTelephonyProviderProcesses:" + sb.toString());
+        return count;
     }
 
     /**

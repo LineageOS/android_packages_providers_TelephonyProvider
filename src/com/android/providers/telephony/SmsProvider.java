@@ -41,6 +41,7 @@ import android.os.Binder;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
+import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -241,6 +242,35 @@ public class SmsProvider extends ContentProvider {
     @RequiresPermission(Manifest.permission.INTERACT_ACROSS_USERS)
     @Override
     public Cursor query(Uri url, String[] projectionIn, String selection,
+            String[] selectionArgs, String sort) {
+        long startTime = SystemClock.elapsedRealtime();
+        Cursor cursor = null;
+        try {
+            cursor = queryInternal(url, projectionIn, selection, selectionArgs, sort);
+            int count = 0;
+            if (cursor != null) {
+                count = cursor.getCount(); // Force evaluation
+            }
+            ProviderMetricsLogger.logOperationLatency(
+                    getContext(),
+                    ProviderMetricsLogger.OPERATION_QUERY,
+                    ProviderMetricsLogger.TARGET_URI_SMS,
+                    startTime,
+                    count);
+        } catch (SQLiteDatabaseLockedException e) { // Lock
+            ProviderMetricsLogger.logDbLockContention(getContext(),
+                    ProviderMetricsLogger.OPERATION_QUERY, ProviderMetricsLogger.TARGET_URI_SMS);
+            throw e;
+        } catch (Exception e) {
+            Log.e("ProviderMetrics", "Database operation failed", e);
+            ProviderUtil.logRunningTelephonyProviderProcesses(getContext());
+            throw e;
+        }
+        return cursor;
+    }
+
+    /** Internal implementation of the database operation. */
+    public Cursor queryInternal(Uri url, String[] projectionIn, String selection,
             String[] selectionArgs, String sort) {
         String callingPackage = getCallingPackage();
         final int callingUid = Binder.getCallingUid();
@@ -823,6 +853,31 @@ public class SmsProvider extends ContentProvider {
 
     @Override
     public Uri insert(Uri url, ContentValues initialValues) {
+        long startTime = SystemClock.elapsedRealtime();
+        Uri result = null;
+        try {
+            result = insertInternal(url, initialValues);
+            int count = (result != null) ? 1 : 0;
+            ProviderMetricsLogger.logOperationLatency(
+                    getContext(),
+                    ProviderMetricsLogger.OPERATION_INSERT,
+                    ProviderMetricsLogger.TARGET_URI_SMS,
+                    startTime,
+                    count);
+        } catch (SQLiteDatabaseLockedException e) { // Lock
+            ProviderMetricsLogger.logDbLockContention(getContext(),
+                    ProviderMetricsLogger.OPERATION_INSERT, ProviderMetricsLogger.TARGET_URI_SMS);
+            throw e;
+        } catch (Exception e) {
+            Log.e("ProviderMetrics", "Database operation failed", e);
+            ProviderUtil.logRunningTelephonyProviderProcesses(getContext());
+            throw e;
+        }
+        return result;
+    }
+
+    /** Internal implementation of the database operation. */
+    public Uri insertInternal(Uri url, ContentValues initialValues) {
         final int callerUid = Binder.getCallingUid();
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         final String callerPkg = getCallingPackage();
@@ -1302,6 +1357,31 @@ public class SmsProvider extends ContentProvider {
 
     @Override
     public int delete(Uri url, String where, String[] whereArgs) {
+        long startTime = SystemClock.elapsedRealtime();
+        int result = 0;
+        try {
+            result = deleteInternal(url, where, whereArgs);
+            int count = result;
+            ProviderMetricsLogger.logOperationLatency(
+                    getContext(),
+                    ProviderMetricsLogger.OPERATION_DELETE,
+                    ProviderMetricsLogger.TARGET_URI_SMS,
+                    startTime,
+                    count);
+        } catch (SQLiteDatabaseLockedException e) { // Lock
+            ProviderMetricsLogger.logDbLockContention(getContext(),
+                    ProviderMetricsLogger.OPERATION_DELETE, ProviderMetricsLogger.TARGET_URI_SMS);
+            throw e;
+        } catch (Exception e) {
+            Log.e("ProviderMetrics", "Database operation failed", e);
+            ProviderUtil.logRunningTelephonyProviderProcesses(getContext());
+            throw e;
+        }
+        return result;
+    }
+
+    /** Internal implementation of the database operation. */
+    public int deleteInternal(Uri url, String where, String[] whereArgs) {
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         final int callerUid = Binder.getCallingUid();
         final long token = Binder.clearCallingIdentity();
@@ -1558,6 +1638,31 @@ public class SmsProvider extends ContentProvider {
 
     @Override
     public int update(Uri url, ContentValues values, String where, String[] whereArgs) {
+        long startTime = SystemClock.elapsedRealtime();
+        int result = 0;
+        try {
+            result = updateInternal(url, values, where, whereArgs);
+            int count = result;
+            ProviderMetricsLogger.logOperationLatency(
+                    getContext(),
+                    ProviderMetricsLogger.OPERATION_UPDATE,
+                    ProviderMetricsLogger.TARGET_URI_SMS,
+                    startTime,
+                    count);
+        } catch (SQLiteDatabaseLockedException e) { // Lock
+            ProviderMetricsLogger.logDbLockContention(getContext(),
+                    ProviderMetricsLogger.OPERATION_UPDATE, ProviderMetricsLogger.TARGET_URI_SMS);
+            throw e;
+        } catch (Exception e) {
+            Log.e("ProviderMetrics", "Database operation failed", e);
+            ProviderUtil.logRunningTelephonyProviderProcesses(getContext());
+            throw e;
+        }
+        return result;
+    }
+
+    /** Internal implementation of the database operation. */
+    public int updateInternal(Uri url, ContentValues values, String where, String[] whereArgs) {
         final int callerUid = Binder.getCallingUid();
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         final String callerPkg = getCallingPackage();

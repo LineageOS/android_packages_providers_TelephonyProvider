@@ -39,6 +39,7 @@ import android.net.Uri;
 import android.provider.Telephony;
 import android.telephony.TelephonyManager;
 import android.test.mock.MockContentResolver;
+import com.android.internal.telephony.metrics.ReadRestrictionStatsLogger;
 import android.util.Log;
 import java.io.File;
 import java.io.IOException;
@@ -92,6 +93,7 @@ public class MmsProviderTest extends TestCase {
         when(context.getPackageManager()).thenReturn(packageManager);
         when(context.getResources()).thenReturn(resources);
         when(resources.getString(anyInt())).thenReturn("");
+        ReadRestrictionStatsLogger.setInstance(mock(ReadRestrictionStatsLogger.class));
 
         /**
          * This is used to give the MmsProviderTest a mocked context which takes a

@@ -33,6 +33,7 @@ import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Telephony;
+import android.provider.Telephony.ReadRestriction;
 import android.telephony.SmsManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
@@ -132,6 +133,21 @@ public class ProviderUtil {
         int op = ((AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE)).noteOpNoThrow(
                 AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES, uid, packageName, null, null);
         return op == AppOpsManager.MODE_ALLOWED;
+    }
+
+    /**
+     * Check if a message is restricted by inspecting the read restriction column.
+     *
+     * @param values The content of the message
+     * @return true if the message is restricted, false otherwise
+     */
+    public static boolean isMessageReadRestricted(ContentValues values) {
+        if (!values.containsKey(ReadRestriction.READ_RESTRICTION_COLUMN_NAME)) {
+            return false;
+        }
+        int readRestriction = values.getAsInteger(ReadRestriction.READ_RESTRICTION_COLUMN_NAME);
+        return (readRestriction & ReadRestriction.ReadRestrictionValues.READ_RESTRICTION_RESTRICTED)
+                > 0;
     }
 
     /**

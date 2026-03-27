@@ -60,10 +60,10 @@ import android.util.Log;
 import android.view.textclassifier.TextClassificationManager;
 import android.view.textclassifier.TextClassifier;
 import android.view.textclassifier.TextLinks;
-
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.SmsApplication;
 import com.android.internal.telephony.TelephonyPermissions;
+import com.android.internal.telephony.metrics.ReadRestrictionStatsLogger;
 import com.android.internal.telephony.flags.Flags;
 import com.android.internal.telephony.util.TelephonyUtils;
 
@@ -280,7 +280,7 @@ public class SmsProvider extends ContentProvider {
         // caller's identity. Only system, phone or the default sms app can have full access
         // of sms data. For other apps, we present a restricted view which only contains sent
         // or received messages.
-        final boolean accessRestricted = ProviderUtil.isAccessRestricted(
+        final boolean accessRestricted =  ProviderUtil.isAccessRestricted(
                 getContext(), getCallingPackage(), callingUid);
         final String smsTable = getSmsTable(accessRestricted);
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
@@ -315,6 +315,14 @@ public class SmsProvider extends ContentProvider {
 
         // Generate the body of the query.
         int match = sURLMatcher.match(url);
+
+        if (Flags.secureAccessToRestrictedRcsMessages()
+                && isAccessingPotentiallyRestrictedMessages(match)) {
+            ReadRestrictionStatsLogger.getInstance().onRestrictedMessagesQueried(
+                    ReadRestrictionStatsLogger.ContentProvider.SMS, callingUid,
+                    canReadRestrictedMessages);
+        }
+
         SQLiteDatabase db = getReadableDatabase(match);
         SQLiteOpenHelper sqLiteOpenHelper = getDBOpenHelper(match);
         if (sqLiteOpenHelper instanceof MmsSmsDatabaseHelper) {
@@ -1183,6 +1191,11 @@ public class SmsProvider extends ContentProvider {
             db.insert(TABLE_WORDS, Telephony.MmsSms.WordsTable.INDEXED_TEXT, cv);
         }
         if (rowID > 0) {
+            if (Flags.secureAccessToRestrictedRcsMessages() && table == TABLE_SMS) {
+                ReadRestrictionStatsLogger.getInstance().onMessageInserted(
+                    ReadRestrictionStatsLogger.ContentProvider.SMS,
+                    callerUid, ProviderUtil.isMessageReadRestricted(values));
+            }
             Uri uri = null;
             if (table == TABLE_SMS) {
                 uri = Uri.withAppendedPath(Sms.CONTENT_URI, String.valueOf(rowID));
@@ -1796,6 +1809,10 @@ public class SmsProvider extends ContentProvider {
             && values.containsKey(ReadRestriction.READ_RESTRICTION_COLUMN_NAME)) {
             count = ReadRestriction.performReadRestrictionDatabaseUpdate(
                 db, table, values, where, whereArgs);
+            if (count > 0 && !ProviderUtil.isMessageReadRestricted(values)) {
+                ReadRestrictionStatsLogger.getInstance().onMessageUnrestricted(
+                        ReadRestrictionStatsLogger.ContentProvider.SMS, callerUid);
+            }
         } else {
             count = db.update(table, values, where, whereArgs);
         }
@@ -1909,6 +1926,26 @@ public class SmsProvider extends ContentProvider {
         //we keep these for not breaking old applications
         sURLMatcher.addURI("sms", "sim", SMS_ALL_ICC);
         sURLMatcher.addURI("sms", "sim/#", SMS_ICC);
+    }
+
+    /**
+     * Returns true if the match is a potentially accessing restricted messages by reading a broad
+     * range of messages, e.g. all messages, inbox, sent, draft, outbox, etc.
+     */
+    private static boolean isAccessingPotentiallyRestrictedMessages(int match) {
+        return match == SMS_ALL
+                || match == SMS_INBOX
+                || match == SMS_SENT
+                || match == SMS_DRAFT
+                || match == SMS_OUTBOX
+                || match == SMS_FAILED
+                || match == SMS_QUEUED
+                || match == SMS_UNDELIVERED
+                || match == SMS_CONVERSATIONS
+                || match == SMS_ATTACHMENT
+                || match == SMS_STATUS_PENDING
+                || match == SMS_ALL_ICC
+                || match == SMS_ALL_ICC_SUBID;
     }
 
     /**

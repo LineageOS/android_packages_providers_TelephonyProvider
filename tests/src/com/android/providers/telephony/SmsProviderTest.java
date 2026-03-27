@@ -24,6 +24,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 import android.app.AppOpsManager;
 import android.app.admin.DevicePolicyManager;
@@ -45,11 +46,15 @@ import android.telephony.TelephonyManager;
 import android.test.mock.MockContentResolver;
 import android.util.Log;
 import android.view.textclassifier.TextClassificationManager;
+import android.platform.test.annotations.EnableFlags;
+import android.os.Process;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
+import com.android.internal.telephony.flags.Flags;
 import com.android.internal.telephony.ISms;
+import com.android.internal.telephony.metrics.ReadRestrictionStatsLogger;
 
 import junit.framework.TestCase;
 
@@ -83,6 +88,7 @@ public class SmsProviderTest extends TestCase {
     @Mock private PackageManager mPackageManager;
     @Mock private Resources mMockResources;
     @Mock private SubscriptionManager mSubscriptionManager;
+    @Mock private ReadRestrictionStatsLogger mReadRestrictionStatsLogger;
 
     private int notifyChangeCount;
 
@@ -154,6 +160,7 @@ public class SmsProviderTest extends TestCase {
 
         mSmsProviderTestable.mTextClassifier = mContext.getSystemService(
                         TextClassificationManager.class).getTextClassifier();
+        ReadRestrictionStatsLogger.setInstance(mReadRestrictionStatsLogger);
 
         // Add given SmsProvider to mResolver with authority="sms" so that
         // mResolver can send queries to mSmsProvider
@@ -210,6 +217,46 @@ public class SmsProviderTest extends TestCase {
         Log.d(TAG, "testInsertAttachmentTable Inserting contentValues: " + values);
         assertEquals(Uri.parse("content://sms/attachments/1"),
                 mContentResolver.insert(Uri.parse("content://sms/attachments"), values));
+    }
+
+    @Test
+    @SmallTest
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    public void testInsert_logsReadRestrictionStats() {
+        // insert test contentValues
+        final ContentValues values = new ContentValues();
+        values.put(Telephony.Sms.ADDRESS, "12345");
+        values.put(Telephony.Sms.BODY, "test");
+        values.put(Telephony.ReadRestriction.RESTRICTED, true);
+        values.put(Telephony.Sms.THREAD_ID, 1);
+
+        mContentResolver.insert(Uri.parse("content://sms"), values);
+
+        verify(mReadRestrictionStatsLogger)
+                .onMessageInserted(
+                ReadRestrictionStatsLogger.ContentProvider.SMS, Process.myUid(), true);
+    }
+
+    @Test
+    @SmallTest
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    public void testUpdate_downgradeToUnrestricted_logsReadRestrictionStats() {
+        // insert test contentValues
+        final ContentValues values = new ContentValues();
+        values.put(Telephony.Sms.ADDRESS, "12345");
+        values.put(Telephony.Sms.BODY, "test");
+        values.put(Telephony.ReadRestriction.RESTRICTED, true);
+        values.put(Telephony.Sms.THREAD_ID, 1);
+
+        Uri messageUri = mContentResolver.insert(Uri.parse("content://sms"), values);
+
+        final ContentValues updateValues = new ContentValues();
+        updateValues.put(Telephony.ReadRestriction.RESTRICTED, false);
+        mContentResolver.update(messageUri, updateValues, null, null);
+
+        verify(mReadRestrictionStatsLogger)
+                .onMessageUnrestricted(
+                ReadRestrictionStatsLogger.ContentProvider.SMS, Process.myUid());
     }
 
     @Test
@@ -291,6 +338,44 @@ public class SmsProviderTest extends TestCase {
                 null);
         assertNull("Cursor should be null due to caught exception for unbalanced parentheses",
                 cursor);
+    }
+
+    @Test
+    @SmallTest
+    @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    public void testQuery_triesToReadAllMessages_logsReadRestrictionStats() {
+                final ContentValues values = new ContentValues();
+        values.put(Telephony.Sms.ADDRESS, "12345");
+        values.put(Telephony.Sms.BODY, "test");
+        values.put(Telephony.ReadRestriction.RESTRICTED, true);
+        values.put(Telephony.Sms.THREAD_ID, 1);
+
+        Uri uri = mContentResolver.insert(Uri.parse("content://sms"), values);
+
+        SQLiteDatabase db = mSmsProviderTestable.mCeOpenHelper.getWritableDatabase();
+        try {
+            db.execSQL(
+                    "CREATE VIEW IF NOT EXISTS sms_restricted AS SELECT _id, thread_id, address, "
+                            + "person, date, date_sent, protocol, read, status, type, "
+                            + "reply_path_present, subject, body, service_center, locked, sub_id,"
+                            + " error_code, creator, seen, read_restriction"
+                            + " FROM sms WHERE (type=1 OR type=2)");
+
+            // Query directly from the database to avoid restricted view issues in tests
+            try (Cursor cursor = mSmsProviderTestable.query(Telephony.Sms.CONTENT_URI, null, null,
+                    null, null)) {
+                assertTrue(cursor.moveToFirst());
+            }
+            verify(mReadRestrictionStatsLogger)
+                    .onRestrictedMessagesQueried(
+                    ReadRestrictionStatsLogger.ContentProvider.SMS, Process.myUid(), true);
+        } finally {
+            try {
+                db.execSQL("DROP VIEW IF EXISTS sms_restricted");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to drop sms_restricted view after test.", e);
+            }
+        }
     }
 
     @Test

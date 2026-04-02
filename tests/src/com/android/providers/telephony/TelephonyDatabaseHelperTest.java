@@ -204,6 +204,62 @@ public final class TelephonyDatabaseHelperTest extends TelephonyTestBase {
         assertTrue(Arrays.asList(upgradedColumns).contains(SubscriptionManager.SUBSCRIPTION_TYPE));
     }
 
+    /**
+     * Case 1: Fresh Device (v78 Schema Default)
+     * Verify that new subscriptions default to -1 (unset) for satellite attach.
+     */
+    @Test
+    public void databaseHelperOnCreate_satelliteAttachEnabledDefaultIsUnset() {
+        Log.d(TAG, "databaseHelperOnCreate_satelliteAttachEnabledDefaultIsUnset");
+        SQLiteDatabase db = mInMemoryDbHelper.getWritableDatabase();
+        // Clear the siminfo table if it exists
+        db.execSQL("DROP TABLE IF EXISTS siminfo");
+        // Create the table using the latest schema
+        db.execSQL(TelephonyProvider.getStringForSimInfoTableCreation("siminfo"));
+
+        ContentValues values = new ContentValues();
+        values.put(Telephony.SimInfo.COLUMN_ICC_ID, "test_icc_id");
+        values.put(Telephony.SimInfo.COLUMN_CARD_ID, "test_card_id");
+        db.insert("siminfo", null, values);
+
+        Cursor cursor = db.query("siminfo",
+                new String[]{Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER},
+                null, null, null, null, null);
+        assertTrue(cursor.moveToFirst());
+        assertEquals(-1, cursor.getInt(0));
+    }
+
+    /**
+     * Case 2: Migration from Legacy v77 Database
+     * Verify that all existing rows are updated from enabled (1) to unset (-1).
+     */
+    @Test
+    public void databaseHelperOnUpgrade_migrateSatelliteAttachEnabledToUnset() {
+        Log.d(TAG, "databaseHelperOnUpgrade_migrateSatelliteAttachEnabledToUnset");
+        SQLiteDatabase db = mInMemoryDbHelper.getWritableDatabase();
+
+        // Upgrade to version 77 first so that the column exists
+        mHelper.onUpgrade(db, (4 << 16), (77 << 16));
+
+        // Insert a row with enabled (1)
+        ContentValues values = new ContentValues();
+        values.put(Telephony.SimInfo.COLUMN_ICC_ID, "test_icc_id_migrate");
+        values.put(Telephony.SimInfo.COLUMN_CARD_ID, "test_card_id_migrate");
+        values.put(Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER, 1);
+        db.insert("siminfo", null, values);
+
+        // Upgrade from 77 to 78
+        mHelper.onUpgrade(db, (77 << 16), (78 << 16));
+
+        // The upgraded db must have -1 for SATELLITE_ATTACH_ENABLED_FOR_CARRIER
+        Cursor cursor = db.query("siminfo",
+                new String[]{Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER},
+                Telephony.SimInfo.COLUMN_ICC_ID + "=?",
+                new String[]{"test_icc_id_migrate"}, null, null, null);
+        assertTrue(cursor.moveToFirst());
+        assertEquals(-1, cursor.getInt(0));
+    }
+
     @Test
     public void databaseHelperOnUpgrade_hasImsRcsUceEnabledField() {
         Log.d(TAG, "databaseHelperOnUpgrade_hasImsRcsUceEnabledField");
@@ -676,59 +732,43 @@ public final class TelephonyDatabaseHelperTest extends TelephonyTestBase {
     @Test
     public void databaseHelperOnUpgrade_hasSatelliteAttachEnabledForCarrierField_updateValue() {
         Log.d(TAG, "databaseHelperOnUpgrade_hasSatelliteAttachEnabledForCarrierField_updateValue");
-        // (5 << 16 | 6) is the first upgrade trigger in onUpgrade
         SQLiteDatabase db = mInMemoryDbHelper.getWritableDatabase();
-        // SATELLITE_ATTACH_ENABLED_FOR_CARRIER default value is set to 0 in version 64.
-        mHelper.onUpgrade(db, (4 << 16), 64);
+
+        // Initial upgrade to ensure the schema is current.
+        mHelper.onUpgrade(db, (4 << 16), TelephonyProvider.getVersion(mContext));
 
         // The upgraded db must have Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER
         Cursor cursor = db.query("siminfo", null, null, null, null, null, null);
-        String[] upgradedColumns = cursor.getColumnNames();
-        Log.d(TAG, "siminfo columns: " + Arrays.toString(upgradedColumns));
-
-        assertTrue(Arrays.asList(upgradedColumns).contains(
+        assertTrue(Arrays.asList(cursor.getColumnNames()).contains(
                 Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER));
 
-        // Insert test contentValues into db.
+        // Insert test contentValues into db with 0 (disabled).
         final int insertSubId = 1;
-        int expectSatelliteAttachEnabledForCarrier = 0;
         ContentValues contentValues = new ContentValues();
-        // Set SATELLITE_ATTACH_ENABLED_FOR_CARRIER to 0 (disabled).
-        contentValues.put(Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER,
-                expectSatelliteAttachEnabledForCarrier);
+        contentValues.put(Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER, 0);
         contentValues.put(Telephony.SimInfo.COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID, insertSubId);
-        // Populate NON NULL columns.
         contentValues.put(Telephony.SimInfo.COLUMN_ICC_ID, "123");
         contentValues.put(Telephony.SimInfo.COLUMN_DISPLAY_NUMBER_FORMAT, 0);
         contentValues.put(Telephony.SimInfo.COLUMN_CARD_ID, "123");
         db.insert("siminfo", null, contentValues);
 
-        // Query SATELLITE_ATTACH_ENABLED_FOR_CARRIER value from db which should be equal to 0.
+        // Verify the value is 0 before the migration.
         final String[] testProjection =
                 {Telephony.SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER};
         final String selection = Telephony.SimInfo.COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID + "=?";
         String[] selectionArgs = {Integer.toString(insertSubId)};
-        cursor = db.query("siminfo", testProjection, selection, selectionArgs,
-                null, null, null);
-        assertNotNull(cursor);
-        assertEquals(1, cursor.getCount());
-        cursor.moveToFirst();
-        int satelliteAttachEnabledForCarrier = cursor.getInt(0);
-        assertEquals(expectSatelliteAttachEnabledForCarrier, satelliteAttachEnabledForCarrier);
+        cursor = db.query("siminfo", testProjection, selection, selectionArgs, null, null, null);
+        assertTrue(cursor.moveToFirst());
+        assertEquals(0, cursor.getInt(0));
 
-        // Upgrade db from version 64 to version 69.
-        mHelper.onUpgrade(db, (64 << 16), 69);
+        // Upgrade db from a legacy version (e.g. 64) to the latest.
+        // This will trigger the version 78 block which updates all rows to -1.
+        mHelper.onUpgrade(db, (64 << 16), (78 << 16));
 
-        // Query SATELLITE_ATTACH_ENABLED_FOR_CARRIER value from db which should be equal to 1
-        // (enabled) after db upgrade.
-        expectSatelliteAttachEnabledForCarrier = 1;
-        cursor = db.query("siminfo", testProjection, selection, selectionArgs,
-                null, null, null);
-        assertNotNull(cursor);
-        assertEquals(1, cursor.getCount());
-        cursor.moveToFirst();
-        satelliteAttachEnabledForCarrier = cursor.getInt(0);
-        assertEquals(expectSatelliteAttachEnabledForCarrier, satelliteAttachEnabledForCarrier);
+        // Query value: it should now be -1 (unset) due to the version 78 migration.
+        cursor = db.query("siminfo", testProjection, selection, selectionArgs, null, null, null);
+        assertTrue(cursor.moveToFirst());
+        assertEquals(-1, cursor.getInt(0));
     }
 
     @Test
@@ -1003,23 +1043,25 @@ public final class TelephonyDatabaseHelperTest extends TelephonyTestBase {
             Log.d(TAG, "InMemoryTelephonyProviderV5DbHelper onCreate creating the carriers table");
             db.execSQL(
                     "CREATE TABLE carriers" +
-                    "(_id INTEGER PRIMARY KEY," +
-                    Carriers.NAME + " TEXT DEFAULT ''," +
-                    Carriers.NUMERIC + " TEXT DEFAULT ''," +
-                    Carriers.MCC + " TEXT DEFAULT ''," +
-                    Carriers.MNC + " TEXT DEFAULT ''," +
-                    Carriers.APN + " TEXT DEFAULT ''," +
-                    Carriers.USER + " TEXT DEFAULT ''," +
-                    Carriers.SERVER + " TEXT DEFAULT ''," +
-                    Carriers.PASSWORD + " TEXT DEFAULT ''," +
-                    Carriers.PROXY + " TEXT DEFAULT ''," +
-                    Carriers.PORT + " TEXT DEFAULT ''," +
-                    Carriers.MMSPROXY + " TEXT DEFAULT ''," +
-                    Carriers.MMSPORT + " TEXT DEFAULT ''," +
-                    Carriers.MMSC + " TEXT DEFAULT ''," +
-                    Carriers.TYPE + " TEXT DEFAULT ''," +
-                    Carriers.CURRENT + " INTEGER," +
-                    "UNIQUE (" + TextUtils.join(", ", originalUniqueFields) + "));");
+                            "(_id INTEGER PRIMARY KEY,"
+                            + Carriers.NAME + " TEXT DEFAULT '',"
+                            + Carriers.NUMERIC + " TEXT DEFAULT '',"
+                            + Carriers.MCC + " TEXT DEFAULT '',"
+                            + Carriers.MNC + " TEXT DEFAULT '',"
+                            + Carriers.APN + " TEXT DEFAULT '',"
+                            + Carriers.USER + " TEXT DEFAULT '',"
+                            + Carriers.SERVER + " TEXT DEFAULT '',"
+                            + Carriers.PASSWORD + " TEXT DEFAULT '',"
+                            + Carriers.PROXY + " TEXT DEFAULT '',"
+                            + Carriers.PORT + " TEXT DEFAULT '',"
+                            + Carriers.MMSPROXY + " TEXT DEFAULT '',"
+                            + Carriers.MMSPORT + " TEXT DEFAULT '',"
+                            + Carriers.MMSC + " TEXT DEFAULT '',"
+                            + Carriers.TYPE + " TEXT DEFAULT '',"
+                            + Carriers.CURRENT + " INTEGER,"
+                            + "UNIQUE ("
+                            + TextUtils.join(", ", originalUniqueFields)
+                            + "));");
 
             // set up the siminfo table without any fields added in onUpgrade
             // since these are the initial fields, there is no need to update this test fixture in
@@ -1027,23 +1069,23 @@ public final class TelephonyDatabaseHelperTest extends TelephonyTestBase {
             Log.d(TAG, "InMemoryTelephonyProviderV5DbHelper onCreate creating the siminfo table");
             db.execSQL(
                     "CREATE TABLE siminfo ("
-                    + Telephony.SimInfo.COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID
-                    + " INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    + Telephony.SimInfo.COLUMN_ICC_ID + " TEXT NOT NULL,"
-                    + Telephony.SimInfo.COLUMN_SIM_SLOT_INDEX
-                        + " INTEGER DEFAULT " + Telephony.SimInfo.SIM_NOT_INSERTED + ","
-                    + Telephony.SimInfo.COLUMN_DISPLAY_NAME + " TEXT,"
-                    + Telephony.SimInfo.COLUMN_NAME_SOURCE
-                        + " INTEGER DEFAULT " + Telephony.SimInfo.NAME_SOURCE_CARRIER_ID + ","
-                    + Telephony.SimInfo.COLUMN_COLOR
-                        + " INTEGER DEFAULT " + Telephony.SimInfo.COLOR_DEFAULT + ","
-                    + Telephony.SimInfo.COLUMN_NUMBER + " TEXT,"
-                    + Telephony.SimInfo.COLUMN_DISPLAY_NUMBER_FORMAT + " INTEGER NOT NULL"
-                        + " DEFAULT " + Telephony.SimInfo.DISPLAY_NUMBER_DEFAULT + ","
-                    + Telephony.SimInfo.COLUMN_DATA_ROAMING
-                        + " INTEGER DEFAULT " + Telephony.SimInfo.DATA_ROAMING_DISABLE + ","
-                    + Telephony.SimInfo.COLUMN_CARD_ID + " TEXT NOT NULL"
-                    + ");");
+                            + Telephony.SimInfo.COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID
+                            + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                            + Telephony.SimInfo.COLUMN_ICC_ID + " TEXT NOT NULL,"
+                            + Telephony.SimInfo.COLUMN_SIM_SLOT_INDEX
+                            + " INTEGER DEFAULT " + Telephony.SimInfo.SIM_NOT_INSERTED + ","
+                            + Telephony.SimInfo.COLUMN_DISPLAY_NAME + " TEXT,"
+                            + Telephony.SimInfo.COLUMN_NAME_SOURCE
+                            + " INTEGER DEFAULT " + Telephony.SimInfo.NAME_SOURCE_CARRIER_ID + ","
+                            + Telephony.SimInfo.COLUMN_COLOR
+                            + " INTEGER DEFAULT " + Telephony.SimInfo.COLOR_DEFAULT + ","
+                            + Telephony.SimInfo.COLUMN_NUMBER + " TEXT,"
+                            + Telephony.SimInfo.COLUMN_DISPLAY_NUMBER_FORMAT + " INTEGER NOT NULL"
+                            + " DEFAULT " + Telephony.SimInfo.DISPLAY_NUMBER_DEFAULT + ","
+                            + Telephony.SimInfo.COLUMN_DATA_ROAMING
+                            + " INTEGER DEFAULT " + Telephony.SimInfo.DATA_ROAMING_DISABLE + ","
+                            + Telephony.SimInfo.COLUMN_CARD_ID + " TEXT NOT NULL"
+                            + ");");
         }
 
         @Override

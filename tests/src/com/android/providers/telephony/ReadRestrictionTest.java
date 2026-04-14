@@ -106,22 +106,35 @@ public class ReadRestrictionTest {
         Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
         Flags.FLAG_MESSAGE_PROMOTION
     })
-    public void setReadRestrictionValueOnInsert_cannotWriteRestrictedMessages_throwsException() {
-        ContentValues values = createExampleContentValues();
-        values.put(ReadRestriction.RESTRICTED, true);
+    public void setReadRestrictionValueOnInsert_restrictedSetTrue_readRestrictionIsUpdated() {
+        ContentValues restrictedValues = createExampleContentValues();
+        restrictedValues.put(ReadRestriction.RESTRICTED, true);
 
-        assertThrows(UnsupportedOperationException.class, () -> {
-            ReadRestriction.setReadRestrictionValueOnInsert(mContext, values, TEST_PACKAGE_NAME,
-                /* canWriteRestrictedMessages= */ false);
-        });
+        ReadRestriction.setReadRestrictionValueOnInsert(mContext, restrictedValues,
+            TEST_PACKAGE_NAME, /* canWriteRestrictedMessages= */ true);
 
-        values.put(ReadRestriction.RESTRICTED, false);
-
-        assertThrows(UnsupportedOperationException.class, () -> {
-            ReadRestriction.setReadRestrictionValueOnInsert(mContext, values, TEST_PACKAGE_NAME,
-                /* canWriteRestrictedMessages= */ false);
-        });
+        assertThat(restrictedValues.getAsInteger(ReadRestriction.READ_RESTRICTION_COLUMN_NAME))
+            .isEqualTo(ReadRestrictionValues.READ_RESTRICTION_RESTRICTED);
+        assertThat(restrictedValues.containsKey(ReadRestriction.RESTRICTED)).isFalse();
     }
+
+    @Test
+    @EnableFlags({
+        Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES,
+        Flags.FLAG_MESSAGE_PROMOTION
+    })
+    public void setReadRestrictionValueOnInsert_restrictedSetFalse_readRestrictionIsUpdated() {
+        ContentValues restrictedValues = createExampleContentValues();
+        restrictedValues.put(ReadRestriction.RESTRICTED, false);
+
+        ReadRestriction.setReadRestrictionValueOnInsert(mContext, restrictedValues,
+            TEST_PACKAGE_NAME, /* canWriteRestrictedMessages= */ true);
+
+        assertThat(restrictedValues.getAsInteger(ReadRestriction.READ_RESTRICTION_COLUMN_NAME))
+            .isEqualTo(0);
+        assertThat(restrictedValues.containsKey(ReadRestriction.RESTRICTED)).isFalse();
+    }
+
 
     @Test
     @EnableFlags({

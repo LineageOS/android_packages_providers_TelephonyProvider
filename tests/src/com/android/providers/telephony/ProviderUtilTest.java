@@ -246,13 +246,13 @@ public class ProviderUtilTest {
 
     @Test
     @EnableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
-    public void canWriteRestrictedMessages_packageNoAppOpGranted_returnsFalse() {
+    public void canWriteRestrictedMessages_packageNoAppOpGranted_returnsTrue() {
         when(mAppOpsManager.noteOpNoThrow(AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES,
                 EXAMPLE_PACKAGE_UID, EXAMPLE_PACKAGE_NAME, null, null)).thenReturn(
                     AppOpsManager.MODE_IGNORED);
 
         assertThat(ProviderUtil.canWriteRestrictedMessages(mContext, EXAMPLE_PACKAGE_NAME,
-                EXAMPLE_PACKAGE_UID)).isFalse();
+                EXAMPLE_PACKAGE_UID)).isTrue();
     }
 
     @Test

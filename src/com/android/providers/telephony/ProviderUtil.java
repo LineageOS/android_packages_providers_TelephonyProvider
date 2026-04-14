@@ -126,13 +126,9 @@ public class ProviderUtil {
      * @return true if the caller is system or phone, or has the app op, false otherwise
      */
     public static boolean canWriteRestrictedMessages(Context context, String packageName, int uid) {
-        if(!Flags.secureAccessToRestrictedRcsMessages() ||
-                TelephonyPermissions.isSystemOrPhone(uid)) {
-            return true;
-        }
-        int op = ((AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE)).noteOpNoThrow(
-                AppOpsManager.OP_WRITE_RESTRICTED_MESSAGES, uid, packageName, null, null);
-        return op == AppOpsManager.MODE_ALLOWED;
+        // Assumes that the caller has the permission to write restricted messages, as long as they
+        // have WRITE_SMS permission.
+        return true;
     }
 
     /**

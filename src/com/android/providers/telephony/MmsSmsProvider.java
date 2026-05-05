@@ -191,7 +191,7 @@ public class MmsSmsProvider extends ContentProvider {
 
     private static final String[] SEARCH_STRING = new String[1];
     private static final String SEARCH_QUERY = "SELECT snippet(words, '', ' ', '', 1, 1) as " +
-            "snippet FROM words WHERE index_text MATCH ? ORDER BY snippet LIMIT 50;";
+            "snippet FROM words WHERE index_text MATCH ?";
 
     private static final String SMS_CONVERSATION_CONSTRAINT = "(" +
             Sms.TYPE + " != " + Sms.MESSAGE_TYPE_DRAFT + ")";
@@ -202,7 +202,10 @@ public class MmsSmsProvider extends ContentProvider {
             Mms.MESSAGE_TYPE + " = " + PduHeaders.MESSAGE_TYPE_RETRIEVE_CONF + " OR " +
             Mms.MESSAGE_TYPE + " = " + PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND + "))";
 
-    private static String getTextSearchQuery(String smsTable, String pduTable) {
+    private static String getTextSearchQuery(String smsTable, String pduTable, String selectionBySubIds) {
+        String smsSubIdClause = !TextUtils.isEmpty(selectionBySubIds)
+                ? " AND " + smsTable + "." + selectionBySubIds.replace("'", "") + " " : "";
+
         // Search on the words table but return the rows from the corresponding sms table
         final String smsQuery = "SELECT "
                 + smsTable + "._id AS _id,"
@@ -216,8 +219,11 @@ public class MmsSmsProvider extends ContentProvider {
                 + "FROM " + smsTable + ",words "
                 + "WHERE (index_text MATCH ? "
                 + "AND " + smsTable + "._id=words.source_id "
+                + smsSubIdClause
                 + "AND words.table_to_use=1)";
 
+        String mmsSubIdClause = !TextUtils.isEmpty(selectionBySubIds)
+                ? " AND " + pduTable + "." + selectionBySubIds.replace("'", "") + " " : "";
         // Search on the words table but return the rows from the corresponding parts table
         final String mmsQuery = "SELECT "
                 + pduTable + "._id,"
@@ -235,6 +241,7 @@ public class MmsSmsProvider extends ContentProvider {
                 + "AND (part.ct='text/plain') "
                 + "AND (index_text MATCH ?) "
                 + "AND (part._id = words.source_id) "
+                + mmsSubIdClause
                 + "AND (words.table_to_use=2))";
 
         // This code queries the sms and mms tables and returns a unified result set
@@ -411,6 +418,13 @@ public class MmsSmsProvider extends ContentProvider {
                             break;
                         }
                     }
+                    if (selectionBySubIds == null) {
+                        // No subscriptions associated with user, return empty cursor.
+                        Log.d(LOG_TAG, "URI_CONVERSATIONS - subId not associated with user.");
+                        return emptyCursor;
+                    }
+                    selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
+
                     cursor = getSimpleConversations(
                             projection, selection, selectionArgs, sortOrder);
                 } else {
@@ -435,11 +449,24 @@ public class MmsSmsProvider extends ContentProvider {
                         selection, sortOrder, smsTable, pduTable);
                 break;
             case URI_CONVERSATIONS_RECIPIENTS:
+                if (selectionBySubIds == null) {
+                    Log.d(LOG_TAG,
+                            "URI_CONVERSATIONS_RECIPIENTS - subId not associated with user.");
+                    return emptyCursor;
+                }
+                selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
+
                 cursor = getConversationById(
                         uri.getPathSegments().get(1), projection, selection,
                         selectionArgs, sortOrder);
                 break;
             case URI_CONVERSATIONS_SUBJECT:
+                if (selectionBySubIds == null) {
+                    Log.d(LOG_TAG, "URI_CONVERSATIONS_SUBJECT - subId not associated with user.");
+                    return emptyCursor;
+                }
+                selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
+
                 cursor = getConversationById(
                         uri.getPathSegments().get(1), projection, selection,
                         selectionArgs, sortOrder);
@@ -493,6 +520,11 @@ public class MmsSmsProvider extends ContentProvider {
                         sortOrder);
                 break;
             case URI_SEARCH_SUGGEST: {
+                if (selectionBySubIds == null) {
+                    Log.d(LOG_TAG, "URI_CONVERSATIONS_SUGGEST - subId not associated with user.");
+                    return emptyCursor;
+                }
+
                 SEARCH_STRING[0] = uri.getQueryParameter("pattern") + '*' ;
 
                 // find the words which match the pattern using the snippet function.  The
@@ -507,7 +539,9 @@ public class MmsSmsProvider extends ContentProvider {
                             "with this query");
                 }
 
-                cursor = db.rawQuery(SEARCH_QUERY, SEARCH_STRING);
+                String searchQuery = SEARCH_QUERY + " AND " + selectionBySubIds.replace("'", "")
+                        + " ORDER BY snippet LIMIT 50;";
+                cursor = db.rawQuery(searchQuery, SEARCH_STRING);
                 break;
             }
             case URI_MESSAGE_ID_TO_THREAD: {
@@ -549,10 +583,15 @@ public class MmsSmsProvider extends ContentProvider {
                             "with this query");
                 }
 
+                if (selectionBySubIds == null) {
+                    Log.d(LOG_TAG, "URI_SEARCH - subId not associated with user.");
+                    return emptyCursor;
+                }
+
                 String searchString = uri.getQueryParameter("pattern") + "*";
 
                 try {
-                    cursor = db.rawQuery(getTextSearchQuery(smsTable, pduTable),
+                    cursor = db.rawQuery(getTextSearchQuery(smsTable, pduTable, selectionBySubIds),
                             new String[] { searchString, searchString });
                 } catch (Exception ex) {
                     Log.e(LOG_TAG, "got exception: " + ex.toString());

@@ -2648,14 +2648,14 @@ carrier_id {
 }
 carrier_id {
   canonical_id: 1363
-  carrier_name: "Aktel"
+  carrier_name: "Robi"
   carrier_attribute {
     mccmnc_tuple: "47002"
   }
 }
 carrier_id {
   canonical_id: 1364
-  carrier_name: "Mobile 2000"
+  carrier_name: "Banglalink"
   carrier_attribute {
     mccmnc_tuple: "47003"
   }

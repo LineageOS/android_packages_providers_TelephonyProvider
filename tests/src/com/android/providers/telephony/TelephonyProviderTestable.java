@@ -89,6 +89,10 @@ public class TelephonyProviderTestable extends TelephonyProvider {
         mMockInjector.fakeCallingUid(uid);
     }
 
+    public void setCompatOverride(long changeId, boolean enabled) {
+        mMockInjector.setCompatOverride(changeId, enabled);
+    }
+
     /**
      * An in memory DB for TelephonyProviderTestable to use
      */
@@ -123,6 +127,7 @@ public class TelephonyProviderTestable extends TelephonyProvider {
 
     static class MockInjector extends Injector {
         private int callingUid = 0;
+        private final java.util.HashMap<Long, Boolean> compatOverrides = new java.util.HashMap<>();
 
         @Override
         int binderGetCallingUid() {
@@ -131,6 +136,15 @@ public class TelephonyProviderTestable extends TelephonyProvider {
 
         void fakeCallingUid(int uid) {
             callingUid = uid;
+        }
+
+        @Override
+        boolean isChangeEnabled(long changeId, int uid) {
+            return compatOverrides.getOrDefault(changeId, true);
+        }
+
+        void setCompatOverride(long changeId, boolean enabled) {
+            compatOverrides.put(changeId, enabled);
         }
     }
 }

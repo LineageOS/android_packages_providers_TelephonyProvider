@@ -23,6 +23,7 @@ import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
 import static junit.framework.Assert.fail;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
@@ -113,6 +114,8 @@ public class TelephonyProviderTest {
     private TelephonyProviderTestable mTelephonyProviderTestable;
     @Mock
     private Resources mockContextResources;
+    @Mock
+    private PackageManager mockPackageManager;
 
     private int notifyChangeCount;
     private int notifyChangeRestoreCount;
@@ -306,8 +309,7 @@ public class TelephonyProviderTest {
                 Manifest.permission.READ_PRIVILEGED_PHONE_STATE,
                 "android.permission.ACCESS_TELEPHONY_SIMINFO_DB");
 
-        public MockContextWithProvider(TelephonyProvider telephonyProvider,
-                Boolean isActiveSubscription) {
+        public MockContextWithProvider(Boolean isActiveSubscription) {
             mResolver = new MockContentResolver() {
                 @Override
                 public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork,
@@ -330,20 +332,6 @@ public class TelephonyProviderTest {
             doReturn(mTelephonyManager).when(mTelephonyManager).createForSubscriptionId(anyInt());
             doReturn(TEST_OPERATOR).when(mTelephonyManager).getSimOperator();
             doReturn(TEST_CARRIERID).when(mTelephonyManager).getSimSpecificCarrierId();
-
-            // Add authority="telephony" to given telephonyProvider
-            ProviderInfo providerInfo = new ProviderInfo();
-            providerInfo.authority = "telephony";
-
-            // Add context to given telephonyProvider
-            telephonyProvider.attachInfoForTesting(this, providerInfo);
-            Log.d(TAG, "MockContextWithProvider: telephonyProvider.getContext(): "
-                    + telephonyProvider.getContext());
-
-            // Add given telephonyProvider to mResolver with authority="telephony" so that
-            // mResolver can send queries to mTelephonyProvider
-            mResolver.addProvider("telephony", telephonyProvider);
-            Log.d(TAG, "MockContextWithProvider: Add telephonyProvider to mResolver");
         }
 
         @Override
@@ -439,10 +427,17 @@ public class TelephonyProviderTest {
     }
 
     private void setUpMockContext(boolean isActiveSubId) {
-        mContext = spy(new MockContextWithProvider(mTelephonyProviderTestable, isActiveSubId));
-        mTelephonyProviderTestable.attachInfoForTesting(mContext, null);
-        mTelephonyProviderTestable.onCreate();
+        mContext = spy(new MockContextWithProvider(isActiveSubId));
+        
+        ProviderInfo providerInfo = new ProviderInfo();
+        providerInfo.authority = "telephony";
+        mTelephonyProviderTestable.attachInfoForTesting(mContext, providerInfo);
+        
         mContentResolver = mContext.getContentResolver();
+        mContentResolver.addProvider("telephony", mTelephonyProviderTestable);
+        
+        mTelephonyProviderTestable.onCreate();
+
     }
 
     @After
@@ -2648,5 +2643,93 @@ public class TelephonyProviderTest {
 
         // The restore should return false or not crash, and log an error
         assertFalse("Restoration should fail with invalid data", result);
+    }
+
+    @Test
+    @SmallTest
+    public void testQueryCarriers_legacyAppEmptyProjection_throwsSecurityException() {
+        setUpMockContext(true);
+        doReturn(mContext).when(mContext).createContextAsUser(any(), anyInt());
+        doReturn(mockPackageManager).when(mContext).getPackageManager();
+        doReturn(new String[0]).when(mockPackageManager).getPackagesForUid(anyInt());
+
+        mTelephonyProviderTestable.setCompatOverride(
+                Carriers.APN_READING_PERMISSION_CHANGE_ID, false);
+
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(Carriers.APN, "exampleApnName");
+        contentValues.put(Carriers.NAME, "exampleName");
+        contentValues.put(Carriers.NUMERIC, TEST_OPERATOR);
+        mContentResolver.insert(Carriers.CONTENT_URI, contentValues);
+
+        mTelephonyProviderTestable.fakeCallingUid(10001);
+        doReturn(PackageManager.PERMISSION_DENIED)
+                .when(mContext).checkCallingOrSelfPermission(Manifest.permission.WRITE_APN_SETTINGS);
+
+        try {
+            mContentResolver.query(Carriers.CONTENT_URI,
+                    new String[0], null, null, null);
+            fail("Query with empty projection should throw SecurityException for legacy app without permission");
+        } catch (SecurityException e) {
+            // expected
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testQueryCarriers_legacyAppNullProjection_throwsSecurityException() {
+        setUpMockContext(true);
+        doReturn(mContext).when(mContext).createContextAsUser(any(), anyInt());
+        doReturn(mockPackageManager).when(mContext).getPackageManager();
+        doReturn(new String[0]).when(mockPackageManager).getPackagesForUid(anyInt());
+
+        mTelephonyProviderTestable.setCompatOverride(
+                Carriers.APN_READING_PERMISSION_CHANGE_ID, false);
+        
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(Carriers.APN, "exampleApnName");
+        mContentResolver.insert(Carriers.CONTENT_URI, contentValues);
+
+        mTelephonyProviderTestable.fakeCallingUid(10001);
+        doReturn(PackageManager.PERMISSION_DENIED)
+                .when(mContext).checkCallingOrSelfPermission(Manifest.permission.WRITE_APN_SETTINGS);
+
+        try {
+            mContentResolver.query(Carriers.CONTENT_URI,
+                    null, null, null, null);
+            fail("Query with null projection should throw SecurityException for legacy app without permission");
+        } catch (SecurityException e) {
+            // expected
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testQueryCarriers_legacyAppAllowedColumns_succeeds() {
+        setUpMockContext(true);
+        doReturn(mContext).when(mContext).createContextAsUser(any(), anyInt());
+        doReturn(mockPackageManager).when(mContext).getPackageManager();
+        doReturn(new String[0]).when(mockPackageManager).getPackagesForUid(anyInt());
+
+        mTelephonyProviderTestable.setCompatOverride(
+                Carriers.APN_READING_PERMISSION_CHANGE_ID, false);
+
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(Carriers.APN, "exampleApnName");
+        contentValues.put(Carriers.NAME, "exampleName");
+        contentValues.put(Carriers.NUMERIC, TEST_OPERATOR);
+        mContentResolver.insert(Carriers.CONTENT_URI, contentValues);
+
+        mTelephonyProviderTestable.fakeCallingUid(10001);
+        doReturn(PackageManager.PERMISSION_DENIED)
+                .when(mContext).checkCallingOrSelfPermission(Manifest.permission.WRITE_APN_SETTINGS);
+
+        String[] projection = new String[] { Carriers.APN };
+        Cursor cursor = mContentResolver.query(Carriers.CONTENT_URI,
+                projection, null, null, null);
+        assertNotNull(cursor);
+        assertEquals(1, cursor.getCount());
+        cursor.moveToFirst();
+        assertEquals("exampleApnName", cursor.getString(0));
     }
 }

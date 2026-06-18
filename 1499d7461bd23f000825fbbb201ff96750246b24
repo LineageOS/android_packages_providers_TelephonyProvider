@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "885727f2_17322753",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 7118
+      },
+      "writtenOn": "2026-06-18T23:00:04Z",
+      "side": 1,
+      "message": "I don\u0027t think this file shouldn\u0027t be edited this way.\nIts just a text version of the actual carrier ID protobuf database.\nREF:  https://github.com/LineageOS/android_packages_providers_TelephonyProvider/blob/lineage-23.2/assets/README\nhttps://source.android.com/docs/core/connect/carrierid",
+      "revId": "1499d7461bd23f000825fbbb201ff96750246b24",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}

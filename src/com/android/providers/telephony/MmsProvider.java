@@ -124,6 +124,14 @@ public class MmsProvider extends ContentProvider {
         final String pduTable = getPduTable(accessRestricted);
 
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
+        if (accessRestricted) {
+            // Enable strict mode to validate columns against projection map and prevent SQL
+            // injection in WHERE clauses.
+            qb.setStrict(true);
+            // Enable strict grammar check to validate SQL syntax and prevent syntax-based
+            // injections (e.g. mismatched parentheses).
+            qb.setStrictGrammar(true);
+        }
 
         // Generate the body of the query.
         int match = sURLMatcher.match(uri);

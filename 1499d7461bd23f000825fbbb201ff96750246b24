@@ -33,6 +33,23 @@
       "message": "Looks fine",
       "revId": "1499d7461bd23f000825fbbb201ff96750246b24",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "04a0357e_c76e62b7",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-06-19T03:25:20Z",
+      "side": 1,
+      "message": "razor: good catch, I assumed this was where the carrier string was read from but you\u0027re right, this really doesn\u0027t do much.",
+      "revId": "1499d7461bd23f000825fbbb201ff96750246b24",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }

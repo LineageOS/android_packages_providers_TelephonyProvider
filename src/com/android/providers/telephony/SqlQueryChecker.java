@@ -17,37 +17,48 @@
 package com.android.providers.telephony;
 
 import android.util.Log;
+import java.util.Locale;
+import java.util.Set;
+import java.util.function.Consumer;
 
 public class SqlQueryChecker {
-    private static final String SELECT_TOKEN = "select";
+    private static final Set<String> DISALLOWED_TOKENS = Set.of(
+            "SELECT",
+            "UNION",
+            "EXCEPT",
+            "INTERSECT",
+            "JOIN",
+            "FROM",
+            "GROUP",
+            "HAVING",
+            "WINDOW",
+            "VALUES"
+    );
 
-    static void checkToken(String token) {
-        if (SELECT_TOKEN.equalsIgnoreCase(token)) {
-            throw new IllegalArgumentException("SELECT token not allowed in query");
+    private static final Set<String> DISALLOWED_FUNCTIONS = Set.of(
+            "HEX", "SUBSTR", "SQLITE_VERSION", "UNICODE", "PRINTF", "INSTR",
+            "RANDOM", "RANDOMBLOB", "ZEROBLOB", "TYPEOF"
+    );
+
+    static void checkTokenForDisallowed(String token) {
+        String tokenUpper = token.toUpperCase(Locale.US);
+        if (DISALLOWED_TOKENS.contains(tokenUpper)) {
+            throw new IllegalArgumentException(tokenUpper + " token not allowed in query");
+        }
+        if (DISALLOWED_FUNCTIONS.contains(tokenUpper)) {
+            throw new IllegalArgumentException("Function " + tokenUpper + " not allowed in query");
         }
     }
 
     /**
-     * Check the query parameters to see if they contain subqueries. Throws an
+     * Check the query parameters to see if they contain disallowed tokens. Throws an
      * {@link IllegalArgumentException} if they do. See
      * {@link android.content.ContentProvider#query} for the definitions of the arguments.
      */
     static void checkQueryParametersForSubqueries(String[] projection,
             String selection, String sortOrder) {
-        Log.v("MmsProvider", "inside checkQueryParametersForSubqueries");
-        if (projection != null) {
-            for (String proj : projection) {
-                Log.v("MmsProvider", "checkQueryParametersForSubqueries checking proj: " + proj);
-                SQLiteTokenizer.tokenize(proj, SQLiteTokenizer.OPTION_NONE,
-                        SqlQueryChecker::checkToken);
-            }
-        }
-        Log.v("MmsProvider", "checkQueryParametersForSubqueries checking sel: " + selection);
-        SQLiteTokenizer.tokenize(selection, SQLiteTokenizer.OPTION_NONE,
-                SqlQueryChecker::checkToken);
-        Log.v("MmsProvider", "checkQueryParametersForSubqueries checking sort: " + sortOrder);
-        SQLiteTokenizer.tokenize(sortOrder, SQLiteTokenizer.OPTION_NONE,
-                SqlQueryChecker::checkToken);
+        checkQueryForToken(projection, selection, sortOrder, "MmsProvider",
+                "checkQueryParametersForSubqueries", SqlQueryChecker::checkTokenForDisallowed);
     }
 
     /**
@@ -59,5 +70,20 @@ public class SqlQueryChecker {
     static void checkSelection(String selection) {
         Log.v("MmsProvider", "inside checkSelection checking sel: " + selection);
         SQLiteTokenizer.tokenize(selection, SQLiteTokenizer.OPTION_CHECK_BRACKETS, null);
+    }
+
+    private static void checkQueryForToken(String[] projection, String selection,
+            String sortOrder, String logTag, String methodName, Consumer<String> checker) {
+        Log.v(logTag, "inside " + methodName);
+        if (projection != null) {
+            for (String proj : projection) {
+                Log.v(logTag, methodName + " checking proj: " + proj);
+                SQLiteTokenizer.tokenize(proj, SQLiteTokenizer.OPTION_NONE, checker);
+            }
+        }
+        Log.v(logTag, methodName + " checking sel: " + selection);
+        SQLiteTokenizer.tokenize(selection, SQLiteTokenizer.OPTION_NONE, checker);
+        Log.v(logTag, methodName + " checking sort: " + sortOrder);
+        SQLiteTokenizer.tokenize(sortOrder, SQLiteTokenizer.OPTION_NONE, checker);
     }
 }

@@ -20,10 +20,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.spy;
 
 import android.app.AppOpsManager;
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -33,6 +34,8 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Process;
 import android.os.UserHandle;
 import android.provider.Telephony;
 import android.telephony.SmsManager;
@@ -40,10 +43,13 @@ import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.test.mock.MockContentResolver;
+import android.test.mock.MockContext;
+import android.test.suitebuilder.annotation.SmallTest;
 import android.util.Log;
 
+
 import androidx.test.core.app.ApplicationProvider;
-import androidx.test.filters.SmallTest;
+import androidx.test.InstrumentationRegistry;
 
 import com.android.internal.telephony.ISms;
 
@@ -345,6 +351,41 @@ public class SmsProviderTest extends TestCase {
             } catch (Exception e) {
                 Log.e(TAG, "Failed to drop sms_restricted view after test.", e);
             }
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testQuery_withMaliciousProjection_rejected() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        // Malicious projection attempting to execute a subquery or inject SQL
+        String[] maliciousProjection = new String[]{"_id", "(SELECT * FROM sms)"};
+
+        try {
+            Cursor cursor = mSmsProviderTestable.query(testUri, maliciousProjection, null, null,
+                    null);
+            assertNull("Cursor should be null due to caught exception for malicious projection",
+                    cursor);
+        } catch (IllegalArgumentException e) {
+            // Expected behavior if strict query validation throws
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testQuery_withMaliciousSortOrder_rejected() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        String[] projection = new String[]{Telephony.Sms._ID};
+        // Malicious sortOrder attempting to inject SQL
+        String maliciousSortOrder = "date DESC; DROP TABLE sms;";
+
+        try {
+            Cursor cursor = mSmsProviderTestable.query(testUri, projection, null, null,
+                    maliciousSortOrder);
+            assertNull("Cursor should be null due to caught exception for malicious sortOrder",
+                    cursor);
+        } catch (IllegalArgumentException e) {
+            // Expected behavior if strict query validation throws
         }
     }
 

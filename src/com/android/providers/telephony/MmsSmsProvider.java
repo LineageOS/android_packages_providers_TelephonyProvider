@@ -46,6 +46,7 @@ import android.telephony.SubscriptionManager;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.android.internal.telephony.TelephonyPermissions;
 import com.android.internal.telephony.TelephonyStatsLog;
 import com.android.internal.telephony.util.TelephonyUtils;
 
@@ -85,9 +86,25 @@ public class MmsSmsProvider extends ContentProvider {
             new UriMatcher(UriMatcher.NO_MATCH);
     private static final String LOG_TAG = "MmsSmsProvider";
     private static final boolean DEBUG = false;
+
+    // ThreadLocal to store the access restriction state of the calling thread.
+    // This allows static helper methods to access the state without propagating it through parameters.
+    private static final ThreadLocal<Boolean> sAccessRestricted = ThreadLocal.withInitial(() -> false);
+
+    private static void configureStrictQueryBuilder(SQLiteQueryBuilder qb) {
+        if (sAccessRestricted.get()) {
+            // Enable strict mode to validate columns against projection map and prevent SQL
+            // injection in WHERE clauses.
+            qb.setStrict(true);
+            // Enable strict grammar check to validate SQL syntax and prevent syntax-based
+            // injections (e.g. mismatched parentheses).
+            qb.setStrictGrammar(true);
+        }
+    }
     private static final int MULTIPLE_THREAD_IDS_FOUND = TelephonyStatsLog
         .MMS_SMS_PROVIDER_GET_THREAD_ID_FAILED__FAILURE_CODE__FAILURE_MULTIPLE_THREAD_IDS_FOUND;
-    private static final int FAILURE_FIND_OR_CREATE_THREAD_ID_SQL = TelephonyStatsLog
+    private static final int FAILURE_FIND_OR_CREATE_THREAD_ID_SQL =
+        TelephonyStatsLog
         .MMS_SMS_PROVIDER_GET_THREAD_ID_FAILED__FAILURE_CODE__FAILURE_FIND_OR_CREATE_THREAD_ID_SQL;
 
     private static final String NO_DELETES_INSERTS_OR_UPDATES =
@@ -346,7 +363,6 @@ public class MmsSmsProvider extends ContentProvider {
             String selection, String[] selectionArgs, String sortOrder) {
         final int callerUid = Binder.getCallingUid();
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
-        String callingPackage = getCallingPackage();
 
         // First check if restricted views of the "sms" and "pdu" tables should be used based on the
         // caller's identity. Only system, phone or the default sms app can have full access
@@ -354,6 +370,11 @@ public class MmsSmsProvider extends ContentProvider {
         // or received messages, without wap pushes.
         final boolean accessRestricted = ProviderUtil.isAccessRestricted(
                 getContext(), getCallingPackage(), callerUid);
+        sAccessRestricted.set(accessRestricted);
+        Cursor cursor = null;
+        Cursor emptyCursor = new MatrixCursor((projection == null) ?
+                (new String[] {}) : projection);
+        try {
         final String pduTable = MmsProvider.getPduTable(accessRestricted);
         final String smsTable = SmsProvider.getSmsTable(accessRestricted);
 
@@ -384,13 +405,6 @@ public class MmsSmsProvider extends ContentProvider {
         }
 
         SQLiteDatabase db = mOpenHelper.getReadableDatabase();
-        if (mOpenHelper instanceof MmsSmsDatabaseHelper) {
-            ((MmsSmsDatabaseHelper) mOpenHelper).addDatabaseOpeningDebugLog(
-                    callingPackage + ";MmsSmsProvider.query;" + uri, true);
-        }
-        Cursor cursor = null;
-        Cursor emptyCursor = new MatrixCursor((projection == null) ?
-                (new String[] {}) : projection);
         final int match = URI_MATCHER.match(uri);
         switch (match) {
             case URI_COMPLETE_CONVERSATIONS:
@@ -688,6 +702,9 @@ public class MmsSmsProvider extends ContentProvider {
                 throw new IllegalStateException("Unrecognized URI:" + uri);
         }
 
+        } finally {
+            sAccessRestricted.remove();
+        }
         if (cursor != null) {
             cursor.setNotificationUri(getContext().getContentResolver(), MmsSms.CONTENT_URI);
         }
@@ -897,9 +914,6 @@ public class MmsSmsProvider extends ContentProvider {
             db.setTransactionSuccessful();
         } catch (Throwable ex) {
             Log.e(LOG_TAG, ex.getMessage(), ex);
-            if (mOpenHelper instanceof MmsSmsDatabaseHelper) {
-                ((MmsSmsDatabaseHelper) mOpenHelper).printDatabaseOpeningDebugLog();
-            }
             TelephonyStatsLog.write(
                 TelephonyStatsLog.MMS_SMS_PROVIDER_GET_THREAD_ID_FAILED,
                 FAILURE_FIND_OR_CREATE_THREAD_ID_SQL);
@@ -982,7 +996,9 @@ public class MmsSmsProvider extends ContentProvider {
             String sortOrder, String smsTable, String pduTable) {
         String[] innerProjection = new String[] {BaseColumns._ID, Conversations.THREAD_ID};
         SQLiteQueryBuilder mmsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(mmsQueryBuilder);
         SQLiteQueryBuilder smsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(smsQueryBuilder);
 
         mmsQueryBuilder.setTables(pduTable);
         smsQueryBuilder.setTables(smsTable);
@@ -998,6 +1014,7 @@ public class MmsSmsProvider extends ContentProvider {
                 concatSelections(selection, Sms.TYPE + "=" + Sms.MESSAGE_TYPE_DRAFT),
                 null, null);
         SQLiteQueryBuilder unionQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(unionQueryBuilder);
 
         unionQueryBuilder.setDistinct(true);
 
@@ -1005,6 +1022,7 @@ public class MmsSmsProvider extends ContentProvider {
                 new String[] { mmsSubQuery, smsSubQuery }, null, null);
 
         SQLiteQueryBuilder outerQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(outerQueryBuilder);
 
         outerQueryBuilder.setTables("(" + unionQuery + ")");
 
@@ -1041,7 +1059,9 @@ public class MmsSmsProvider extends ContentProvider {
     private Cursor getConversations(String[] projection, String selection,
             String sortOrder, String smsTable, String pduTable) {
         SQLiteQueryBuilder mmsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(mmsQueryBuilder);
         SQLiteQueryBuilder smsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(smsQueryBuilder);
 
         mmsQueryBuilder.setTables(pduTable);
         smsQueryBuilder.setTables(smsTable);
@@ -1062,6 +1082,7 @@ public class MmsSmsProvider extends ContentProvider {
                 concatSelections(selection, SMS_CONVERSATION_CONSTRAINT),
                 "thread_id", "date = MAX(date)");
         SQLiteQueryBuilder unionQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(unionQueryBuilder);
 
         unionQueryBuilder.setDistinct(true);
 
@@ -1069,6 +1090,7 @@ public class MmsSmsProvider extends ContentProvider {
                 new String[] { mmsSubQuery, smsSubQuery }, null, null);
 
         SQLiteQueryBuilder outerQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(outerQueryBuilder);
 
         outerQueryBuilder.setTables("(" + unionQuery + ")");
 
@@ -1094,7 +1116,9 @@ public class MmsSmsProvider extends ContentProvider {
     private Cursor getFirstLockedMessage(String[] projection, String selection,
             String sortOrder, String smsTable, String pduTable) {
         SQLiteQueryBuilder mmsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(mmsQueryBuilder);
         SQLiteQueryBuilder smsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(smsQueryBuilder);
 
         mmsQueryBuilder.setTables(pduTable);
         smsQueryBuilder.setTables(smsTable);
@@ -1115,6 +1139,7 @@ public class MmsSmsProvider extends ContentProvider {
                 BaseColumns._ID, "locked=1");
 
         SQLiteQueryBuilder unionQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(unionQueryBuilder);
 
         unionQueryBuilder.setDistinct(true);
 
@@ -1217,7 +1242,9 @@ public class MmsSmsProvider extends ContentProvider {
                         "(address=? OR PHONE_NUMBERS_EQUAL(address, ?" +
                         (mUseStrictPhoneNumberComparation ? ", 1))" : ", 0, " + minMatch + "))"));
         SQLiteQueryBuilder mmsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(mmsQueryBuilder);
         SQLiteQueryBuilder smsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(smsQueryBuilder);
 
         mmsQueryBuilder.setDistinct(true);
         smsQueryBuilder.setDistinct(true);
@@ -1238,6 +1265,7 @@ public class MmsSmsProvider extends ContentProvider {
                 MmsSms.TYPE_DISCRIMINATOR_COLUMN, columns, SMS_COLUMNS,
                 0, "sms", finalSmsSelection, null, null);
         SQLiteQueryBuilder unionQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(unionQueryBuilder);
 
         unionQueryBuilder.setDistinct(true);
 
@@ -1264,6 +1292,7 @@ public class MmsSmsProvider extends ContentProvider {
         String extraSelection = "_id=" + threadIdString;
         String finalSelection = concatSelections(selection, extraSelection);
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(queryBuilder);
         String[] columns = handleNullThreadsProjection(projection);
 
         queryBuilder.setDistinct(true);
@@ -1296,7 +1325,9 @@ public class MmsSmsProvider extends ContentProvider {
         String[] mmsProjection = createMmsProjection(projection, pduTable);
 
         SQLiteQueryBuilder mmsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(mmsQueryBuilder);
         SQLiteQueryBuilder smsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(smsQueryBuilder);
 
         mmsQueryBuilder.setTables(joinPduAndPendingMsgTables(pduTable));
         smsQueryBuilder.setTables(smsTable);
@@ -1327,6 +1358,7 @@ public class MmsSmsProvider extends ContentProvider {
                 SMS_COLUMNS, 1, "sms", finalSmsSelection,
                 null, null);
         SQLiteQueryBuilder unionQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(unionQueryBuilder);
 
         unionQueryBuilder.setDistinct(true);
 
@@ -1334,6 +1366,7 @@ public class MmsSmsProvider extends ContentProvider {
                 new String[] { smsSubQuery, mmsSubQuery }, null, null);
 
         SQLiteQueryBuilder outerQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(outerQueryBuilder);
 
         outerQueryBuilder.setTables("(" + unionQuery + ")");
 
@@ -1362,7 +1395,9 @@ public class MmsSmsProvider extends ContentProvider {
         String[] mmsProjection = createMmsProjection(projection, pduTable);
 
         SQLiteQueryBuilder mmsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(mmsQueryBuilder);
         SQLiteQueryBuilder smsQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(smsQueryBuilder);
 
         mmsQueryBuilder.setDistinct(true);
         smsQueryBuilder.setDistinct(true);
@@ -1390,6 +1425,7 @@ public class MmsSmsProvider extends ContentProvider {
                 0, "sms", concatSelections(selection, SMS_CONVERSATION_CONSTRAINT),
                 null, null);
         SQLiteQueryBuilder unionQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(unionQueryBuilder);
 
         unionQueryBuilder.setDistinct(true);
 
@@ -1398,6 +1434,7 @@ public class MmsSmsProvider extends ContentProvider {
                 handleNullSortOrder(sortOrder), null);
 
         SQLiteQueryBuilder outerQueryBuilder = new SQLiteQueryBuilder();
+        configureStrictQueryBuilder(outerQueryBuilder);
 
         outerQueryBuilder.setTables("(" + unionQuery + ")");
 
@@ -1411,7 +1448,8 @@ public class MmsSmsProvider extends ContentProvider {
     }
 
     @Override
-    public int delete(Uri uri, String selection, String[] selectionArgs) {
+    public int delete(Uri uri, String selection,
+            String[] selectionArgs) {
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         String selectionBySubIds;
         final long token = Binder.clearCallingIdentity();
@@ -1423,13 +1461,6 @@ public class MmsSmsProvider extends ContentProvider {
         }
 
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-        String debugMessage = getCallingPackage() + ";MmsSmsProvider.delete;" + uri;
-        // Always log delete for debug purpose, as delete is a critical but non-frequent operation.
-        Log.d(LOG_TAG, debugMessage);
-        if (mOpenHelper instanceof MmsSmsDatabaseHelper) {
-            ((MmsSmsDatabaseHelper) mOpenHelper).addDatabaseOpeningDebugLog(
-                    debugMessage, false);
-        }
         Context context = getContext();
         int affectedRows = 0;
 
@@ -1501,12 +1532,8 @@ public class MmsSmsProvider extends ContentProvider {
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         final int callerUid = Binder.getCallingUid();
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-        if (mOpenHelper instanceof MmsSmsDatabaseHelper) {
-            ((MmsSmsDatabaseHelper) mOpenHelper).addDatabaseOpeningDebugLog(
-                    getCallingPackage() + ";MmsSmsProvider.insert;" + uri, false);
-        }
-
         int matchIndex = URI_MATCHER.match(uri);
+
         // TODO (b/256992531): Currently, one sim card is set as default sms subId in work
         //  profile. Default sms subId should be updated based on user pref.
         int defaultSmsSubId = SmsManager.getDefaultSmsSubscriptionId();
@@ -1521,9 +1548,8 @@ public class MmsSmsProvider extends ContentProvider {
                 }
             }
 
-            if (!ProviderUtil
-                    .allowInteractingWithEntryOfSubscription(getContext(), subId,
-                            callerUserHandle)) {
+            if (!TelephonyPermissions
+                    .checkSubscriptionAssociatedWithUser(getContext(), subId, callerUserHandle)) {
                 TelephonyUtils.showSwitchToManagedProfileDialogIfAppropriate(getContext(), subId,
                         callerUid, getCallingPackage());
                 return null;
@@ -1561,11 +1587,6 @@ public class MmsSmsProvider extends ContentProvider {
         }
 
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-        if (mOpenHelper instanceof MmsSmsDatabaseHelper) {
-            ((MmsSmsDatabaseHelper) mOpenHelper).addDatabaseOpeningDebugLog(
-                    callerPkg + ";MmsSmsProvider.update;" + uri, false);
-        }
-
         int affectedRows = 0;
         switch(URI_MATCHER.match(uri)) {
             case URI_CONVERSATIONS_MESSAGES:

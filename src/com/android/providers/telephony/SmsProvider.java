@@ -997,6 +997,13 @@ public class SmsProvider extends ContentProvider {
 
     @Override
     public int delete(Uri url, String where, String[] whereArgs) {
+        try {
+            SqlQueryChecker.checkSelection(where);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Delete rejected: " + e.getMessage());
+            return 0;
+        }
+
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         final int callerUid = Binder.getCallingUid();
         final long token = Binder.clearCallingIdentity();
@@ -1246,6 +1253,13 @@ public class SmsProvider extends ContentProvider {
 
     @Override
     public int update(Uri url, ContentValues values, String where, String[] whereArgs) {
+        try {
+            SqlQueryChecker.checkSelection(where);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Update rejected: " + e.getMessage());
+            return 0;
+        }
+
         final int callerUid = Binder.getCallingUid();
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         final String callerPkg = getCallingPackage();

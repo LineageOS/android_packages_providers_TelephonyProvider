@@ -288,6 +288,26 @@ public class SmsProviderTest extends TestCase {
 
     @Test
     @SmallTest
+    public void testDelete_withUnbalancedParentheses_returnsZero() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        String maliciousSelection = "1=1) OR (1=1";
+        int count = mSmsProviderTestable.delete(testUri, maliciousSelection, null);
+        assertEquals(0, count);
+    }
+
+    @Test
+    @SmallTest
+    public void testUpdate_withUnbalancedParentheses_returnsZero() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        ContentValues values = new ContentValues();
+        values.put(Telephony.Sms.READ, 1);
+        String maliciousSelection = "1=1) OR (1=1";
+        int count = mSmsProviderTestable.update(testUri, values, maliciousSelection, null);
+        assertEquals(0, count);
+    }
+
+    @Test
+    @SmallTest
     public void testQuery_withMaliciousClosingParenthesis_returnsNull() {
         Uri testUri = Telephony.Sms.CONTENT_URI;
         String[] projection = new String[]{Telephony.Sms._ID};

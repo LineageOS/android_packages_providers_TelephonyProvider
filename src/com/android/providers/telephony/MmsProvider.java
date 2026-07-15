@@ -1083,6 +1083,13 @@ public class MmsProvider extends ContentProvider {
     /** Internal implementation of the database operation. */
     public int deleteInternal(Uri uri, String selection,
             String[] selectionArgs) {
+        try {
+            SqlQueryChecker.checkSelection(selection);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Delete rejected: " + e.getMessage());
+            return 0;
+        }
+
         final UserHandle callerUserHandle = Binder.getCallingUserHandle();
         int match = sURLMatcher.match(uri);
         if (LOCAL_LOGV) {
@@ -1322,6 +1329,13 @@ public class MmsProvider extends ContentProvider {
     /** Internal implementation of the database operation. */
     public int updateInternal(Uri uri, ContentValues values,
             String selection, String[] selectionArgs) {
+        try {
+            SqlQueryChecker.checkSelection(selection);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Update rejected: " + e.getMessage());
+            return 0;
+        }
+
         // The _data column is filled internally in MmsProvider, so this check is just to avoid
         // it from being inadvertently set. This is not supposed to be a protection against
         // malicious attack, since sql injection could still be attempted to bypass the check. On

@@ -67,4 +67,26 @@ public class SqlQueryCheckerTest {
         String[] projection = {"COUNT(*)", "MAX(date)", "MIN(date)", "SUM(_id)", "AVG(_id)"};
         SqlQueryChecker.checkQueryParametersForSubqueries(projection, null, null);
     }
+
+    @Test
+    public void testCheckSelection_validBalancedParentheses() {
+        SqlQueryChecker.checkSelection("thread_id=1");
+        SqlQueryChecker.checkSelection("(read=1)");
+        SqlQueryChecker.checkSelection("(read=1 AND seen=0)");
+        SqlQueryChecker.checkSelection(null);
+        SqlQueryChecker.checkSelection("");
+    }
+
+    @Test
+    public void testCheckSelection_invalidUnbalancedParentheses() {
+        assertThrows(IllegalArgumentException.class, () ->
+                SqlQueryChecker.checkSelection("1=1) OR (1=1"));
+        assertThrows(IllegalArgumentException.class, () ->
+                SqlQueryChecker.checkSelection(") OR (1=1"));
+        assertThrows(IllegalArgumentException.class, () ->
+                SqlQueryChecker.checkSelection("(read=1"));
+        assertThrows(IllegalArgumentException.class, () ->
+                SqlQueryChecker.checkSelection("((read=1)"));
+    }
 }
+

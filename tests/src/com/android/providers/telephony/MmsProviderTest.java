@@ -267,6 +267,25 @@ public class MmsProviderTest extends TestCase {
     }
 
     @Test
+    public void testDelete_withUnbalancedParentheses_returnsZero() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String maliciousSelection = "1=1) OR (1=1";
+        int count = mMmsProviderTestable.delete(testUri, maliciousSelection, null);
+        assertEquals(0, count);
+    }
+
+    @Test
+    public void testUpdate_withUnbalancedParentheses_returnsZero() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        ContentValues values = new ContentValues();
+        values.put(Telephony.Mms.READ, 1);
+        String maliciousSelection = "1=1) OR (1=1";
+        int count = mMmsProviderTestable.update(testUri, values, maliciousSelection, null);
+        assertEquals(0, count);
+    }
+
+
+    @Test
     public void testQuery_withProperlyBalancedParentheses_doesNotReturnNull() {
         Uri testUri = Telephony.Mms.CONTENT_URI;
         String[] projection = new String[]{"_id"};

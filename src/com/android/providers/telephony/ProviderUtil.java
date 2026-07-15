@@ -253,10 +253,10 @@ public class ProviderUtil {
                             .filter(info -> userHandle.equals(subManager
                                             .getSubscriptionUserHandle(info.getSubscriptionId())))
                             .collect(Collectors.toList());
-                } else {
+                } else if (userHandle.isSystem()) {
                     // SMS/MMS restored from another device have sub_id=-1.
                     // To query/update/delete those messages, sub_id=-1 should be in the selection
-                    // string.
+                    // string for the system user.
                     SubscriptionInfo invalidSubInfo = new SubscriptionInfo.Builder()
                             .setId(SubscriptionManager.INVALID_SUBSCRIPTION_ID)
                             .build();
@@ -270,11 +270,10 @@ public class ProviderUtil {
                         .getSubscriptionInfoListAssociatedWithUser(userHandle);
             }
 
-            if ((userManager != null)
-                    && (!userManager.isManagedProfile(userHandle.getIdentifier()))) {
+            if (userHandle.isSystem()) {
                 // SMS/MMS restored from another device have sub_id=-1.
                 // To query/update/delete those messages, sub_id=-1 should be in the selection
-                // string.
+                // string for the system user.
                 SubscriptionInfo invalidSubInfo = new SubscriptionInfo.Builder()
                         .setId(SubscriptionManager.INVALID_SUBSCRIPTION_ID)
                         .build();

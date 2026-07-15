@@ -166,6 +166,64 @@ public class ProviderUtilTest {
     }
 
     @Test
+    public void getSelectionBySubIds_nonSystemUser_noSubscription() {
+        UserHandle nonSystemUser = UserHandle.of(10);
+        List<SubscriptionInfo> subscriptionInfoList = new ArrayList<>();
+        doReturn(subscriptionInfoList).when(mSubscriptionManager)
+                .getSubscriptionInfoListAssociatedWithUser(nonSystemUser);
+
+        assertThat(ProviderUtil.getSelectionBySubIds(mContext, nonSystemUser, null))
+                .isNull();
+    }
+
+    @Test
+    public void getSelectionBySubIds_nonSystemUser_withActiveSubscriptions() {
+        UserHandle nonSystemUser = UserHandle.of(10);
+        SubscriptionInfo subscriptionInfo1 = new SubscriptionInfo.Builder()
+                .setId(1)
+                .setSimSlotIndex(0)
+                .build();
+        List<SubscriptionInfo> subscriptionInfoList = new ArrayList<>();
+
+        SubscriptionInfo subscriptionInfo2 = new SubscriptionInfo.Builder()
+                .setId(2)
+                .setSimSlotIndex(1)
+                .build();
+
+        subscriptionInfoList.add(subscriptionInfo1);
+        subscriptionInfoList.add(subscriptionInfo2);
+        doReturn(subscriptionInfoList).when(mSubscriptionManager)
+                .getSubscriptionInfoListAssociatedWithUser(nonSystemUser);
+
+        assertThat(ProviderUtil.getSelectionBySubIds(mContext, nonSystemUser, null))
+                .isEqualTo("sub_id IN ('1','2')");
+    }
+
+    @Test
+    public void getSelectionBySubIds_nonSystemUser_withTableName_withActiveSubscriptions() {
+        String tableName = "pdu";
+        UserHandle nonSystemUser = UserHandle.of(10);
+        SubscriptionInfo subscriptionInfo1 = new SubscriptionInfo.Builder()
+                .setId(1)
+                .setSimSlotIndex(0)
+                .build();
+        List<SubscriptionInfo> subscriptionInfoList = new ArrayList<>();
+
+        SubscriptionInfo subscriptionInfo2 = new SubscriptionInfo.Builder()
+                .setId(2)
+                .setSimSlotIndex(1)
+                .build();
+
+        subscriptionInfoList.add(subscriptionInfo1);
+        subscriptionInfoList.add(subscriptionInfo2);
+        doReturn(subscriptionInfoList).when(mSubscriptionManager)
+                .getSubscriptionInfoListAssociatedWithUser(nonSystemUser);
+
+        assertThat(ProviderUtil.getSelectionBySubIds(mContext, nonSystemUser, tableName))
+                .isEqualTo(tableName + "." + "sub_id IN ('1','2')");
+    }
+
+    @Test
     public void getSelectionByEmergencyNumbers_nullEmergencyNumberList() {
         doReturn(null).when(mTelephonyManager).getEmergencyNumberList();
 

@@ -535,6 +535,10 @@ public class TelephonyProvider extends ContentProvider
         int binderGetCallingUid() {
             return Binder.getCallingUid();
         }
+
+        boolean isChangeEnabled(long changeId, int uid) {
+            return CompatChanges.isChangeEnabled(changeId, uid);
+        }
     }
 
     public TelephonyProvider() {
@@ -3962,9 +3966,9 @@ public class TelephonyProvider extends ContentProvider
      * use the legacy checkQueryPermission method to see if the query should be allowed.
      */
     private void checkPermissionCompat(int match, String[] projectionIn) {
-        boolean useNewBehavior = CompatChanges.isChangeEnabled(
+        boolean useNewBehavior = mInjector.isChangeEnabled(
                 Telephony.Carriers.APN_READING_PERMISSION_CHANGE_ID,
-                Binder.getCallingUid());
+                mInjector.binderGetCallingUid());
 
         if (!useNewBehavior) {
             log("Using old permission behavior for telephony provider compat");
@@ -3976,7 +3980,7 @@ public class TelephonyProvider extends ContentProvider
 
     private void checkQueryPermission(int match, String[] projectionIn) {
         if (match != URL_SIMINFO) {
-            if (projectionIn != null) {
+            if (projectionIn != null && projectionIn.length > 0) {
                 for (String column : projectionIn) {
                     if (TYPE.equals(column) ||
                             MMSC.equals(column) ||

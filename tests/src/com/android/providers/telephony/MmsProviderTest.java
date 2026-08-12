@@ -36,7 +36,11 @@ import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.UserHandle;
+import android.os.UserManager;
 import android.provider.Telephony;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.test.mock.MockContentResolver;
 import com.android.internal.telephony.metrics.ReadRestrictionStatsLogger;
@@ -47,7 +51,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.mockito.Mock;
-
+import java.util.ArrayList;
+import java.util.List;
 import junit.framework.TestCase;
 
 import org.junit.Test;
@@ -94,6 +99,28 @@ public class MmsProviderTest extends TestCase {
         when(context.getResources()).thenReturn(resources);
         when(resources.getString(anyInt())).thenReturn("");
         ReadRestrictionStatsLogger.setInstance(mock(ReadRestrictionStatsLogger.class));
+
+        SubscriptionManager subscriptionManager = mock(SubscriptionManager.class);
+        UserManager userManager = mock(UserManager.class);
+        when(context.getSystemServiceName(eq(SubscriptionManager.class)))
+                .thenReturn(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+        when(context.getSystemService(eq(Context.TELEPHONY_SUBSCRIPTION_SERVICE)))
+                .thenReturn(subscriptionManager);
+        when(context.getSystemServiceName(eq(UserManager.class)))
+                .thenReturn(Context.USER_SERVICE);
+        when(context.getSystemService(eq(Context.USER_SERVICE)))
+                .thenReturn(userManager);
+
+        List<SubscriptionInfo> subInfoList = new ArrayList<>();
+        SubscriptionInfo subInfo = mock(SubscriptionInfo.class);
+        when(subInfo.getSubscriptionId()).thenReturn(1);
+        subInfoList.add(subInfo);
+
+        when(subscriptionManager.getSubscriptionInfoListAssociatedWithUser(any(UserHandle.class)))
+                .thenReturn(subInfoList);
+        when(subscriptionManager.isSubscriptionAssociatedWithUser(anyInt(), any(UserHandle.class)))
+                .thenReturn(true);
+        when(userManager.isManagedProfile(anyInt())).thenReturn(false);
 
         /**
          * This is used to give the MmsProviderTest a mocked context which takes a
@@ -358,5 +385,23 @@ public class MmsProviderTest extends TestCase {
 
         org.junit.Assert.assertThrows(IllegalArgumentException.class, () ->
                 mMmsProviderTestable.query(testUri, projection, null, null, null));
+    }
+
+    @Test
+    public void testInsert_unassociatedSubId_forAddrOrPartTable_isBlocked() {
+        SubscriptionManager mockSubManager = mock(SubscriptionManager.class);
+        when(context.getSystemService(SubscriptionManager.class)).thenReturn(mockSubManager);
+        when(context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE)).thenReturn(mockSubManager);
+        when(mockSubManager.isSubscriptionAssociatedWithUser(eq(1), any(UserHandle.class)))
+                .thenReturn(false);
+
+        ContentValues values = new ContentValues();
+        values.put(Telephony.Mms.SUBSCRIPTION_ID, 1);
+        values.put(Telephony.Mms.Addr.ADDRESS, "12345");
+        values.put(Telephony.Mms.Addr.TYPE, 151);
+
+        Uri addrUri = Uri.parse("content://mms/1/addr");
+        Uri resultUri = mContentResolver.insert(addrUri, values);
+        assertNull(resultUri);
     }
 }

@@ -765,14 +765,14 @@ public class MmsProvider extends ContentProvider {
             }
         }
 
-        if (table.equals(TABLE_PDU)) {
-            if (!ProviderUtil.allowInteractingWithEntryOfSubscription(getContext(), subId,
-                    callerUserHandle)) {
-                TelephonyUtils.showSwitchToManagedProfileDialogIfAppropriate(getContext(), subId,
-                        callerUid, callerPkg);
-                return null;
-            }
+        if (!ProviderUtil.allowInteractingWithEntryOfSubscription(
+                getContext(), subId, callerUserHandle)) {
+            TelephonyUtils.showSwitchToManagedProfileDialogIfAppropriate(
+                    getContext(), subId, callerUid, callerPkg);
+            return null;
+        }
 
+        if (table.equals(TABLE_PDU)) {
             boolean addDate = !values.containsKey(Mms.DATE);
             boolean addMsgBox = !values.containsKey(Mms.MESSAGE_BOX);
 
